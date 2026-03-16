@@ -58,7 +58,7 @@ Use [`build/maestrovm`](../build/maestrovm) to load and run a module
 from the artifact:
 
 ```sh
-build/maestrovm build/examples/modules.mstro app.caller
+build/maestrovm build/examples/modules.mstro "app caller"
 ```
 
 Note that [`build/maestrovm`](../build/maestrovm) is a thin runtime

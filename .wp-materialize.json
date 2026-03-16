@@ -1,0 +1,39 @@
+{
+  "categories": {
+    "content": ["Blogs/Projects/Maestro"],
+    "inherit": true
+  },
+  "tags": {
+    "content": [
+      "system-design",
+      "state-machines",
+      "programming-languages",
+      "language-design",
+      "virtual-machines",
+      "compiler-design",
+      "embedded-systems",
+      "lisp",
+      "tool-calling"
+    ],
+    "inherit": true
+  },
+  "author": {
+    "content": ["1"],
+    "inherit": true
+  },
+  "renderer": "pandoc",
+  "hard_line_breaks": false,
+  "block_html": true,
+  "subdirectories": {
+    "content": [],
+    "inherit": true
+  },
+  "files": {
+    "docs/design/language-specs.md": {
+      "use_heading_as_title": {
+        "level": 1,
+        "strict": true
+      }
+    }
+  }
+}

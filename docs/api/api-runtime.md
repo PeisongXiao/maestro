@@ -162,6 +162,13 @@ int maestro_run(maestro_ctx *ctx, const char *module_path,
 
 Runs the program identified by `module_path`.
 
+`module_path` is a space-separated logical module path, for example:
+
+```text
+app caller
+tests modules worker
+```
+
 Input argument rules:
 
 - `args` may be `NULL` only when `argc == 0`

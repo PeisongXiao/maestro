@@ -548,6 +548,21 @@ Example:
 "hello"
 ```
 
+Ordinary Maestro strings use a small escape set:
+
+- `\n`
+- `\t`
+- `\"`
+- `\\`
+
+Other escaped characters are not interpreted using full C or JSON
+rules. If an unknown escape is written, the escaped character is taken
+literally.
+
+Ordinary Maestro strings may span multiple source lines. A raw newline
+inside the quoted string becomes a newline character in the resulting
+value.
+
 The empty string literal is `empty-string`.
 
 Example:
@@ -599,6 +614,20 @@ This is checked at runtime.
 JSON snippets may not contain symbols, with one exception: a list of
 symbols such as `(list 'sym-a 'sym-b)` may be evaluated as a list of
 strings.
+
+JSON snippet strings follow JSON-style escaping more closely than
+ordinary Maestro strings. They support:
+
+- `\"`
+- `\\`
+- `\/`
+- `\b`
+- `\f`
+- `\n`
+- `\r`
+- `\t`
+
+Raw multi-line JSON strings are not valid.
 
 Example:
 

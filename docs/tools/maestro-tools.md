@@ -29,7 +29,8 @@ It is responsible for:
 - reading a `.mstro` image
 - loading it into a default `maestro_ctx`
 - validating the image and host bindings
-- running a module by logical module path
+- running a module by logical module path supplied as one
+  space-separated string
 - printing the resulting `maestro_value`
 
 It is useful for smoke tests and manual runtime checks.
@@ -57,4 +58,4 @@ It is responsible for:
 - capturing `print` and `log`
 - validating required externals when needed
 - filtering the run to specific module paths when positional arguments
-  are supplied
+  are supplied, using the same space-separated module path text

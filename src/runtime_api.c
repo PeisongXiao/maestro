@@ -131,12 +131,14 @@ int maestro_load(maestro_ctx *dest, const void *src) {
         dest->img_mods = (const uint8_t *)src + hdr->mod_off;
         dest->img_exts = (const uint8_t *)src + hdr->ext_off;
         dest->img_idents = (const uint8_t *)src + hdr->ident_off;
+        dest->img_paths = (const uint8_t *)src + hdr->path_off;
         dest->img_nodes = (const uint8_t *)src + hdr->node_off;
         dest->img_kv = (const uint8_t *)src + hdr->kv_off;
         dest->img_strs = (const char *)src + hdr->str_off;
         dest->img_mod_nr = hdr->mod_nr;
         dest->img_ext_nr = hdr->ext_nr;
         dest->img_ident_nr = hdr->ident_nr;
+        dest->img_path_nr = hdr->path_nr;
         dest->img_node_nr = hdr->node_nr;
         dest->img_kv_nr = hdr->kv_nr;
         return 0;
@@ -175,7 +177,8 @@ uint64_t maestro_validate(maestro_ctx *dest, FILE *err) {
 
         if (hdr->mod_off < sizeof(*hdr) || hdr->node_off < hdr->mod_off ||
             hdr->ext_off < hdr->mod_off || hdr->ident_off < hdr->ext_off ||
-            hdr->node_off < hdr->ident_off || hdr->kv_off < hdr->node_off ||
+            hdr->path_off < hdr->ident_off || hdr->node_off < hdr->path_off ||
+            hdr->kv_off < hdr->node_off ||
             hdr->str_off < hdr->kv_off ||
             hdr->str_off + hdr->str_sz > hdr->size)
                 flags |= MAESTRO_VERR_IMAGE;
@@ -183,6 +186,7 @@ uint64_t maestro_validate(maestro_ctx *dest, FILE *err) {
         if (hdr->mod_off + hdr->mod_nr * sizeof(struct img_mod) > hdr->size ||
             hdr->ext_off + hdr->ext_nr * sizeof(struct img_ext) > hdr->size ||
             hdr->ident_off + hdr->ident_nr * sizeof(struct img_ident) > hdr->size ||
+            hdr->path_off + hdr->path_nr * sizeof(struct img_path) > hdr->size ||
             hdr->node_off + hdr->node_nr * sizeof(struct img_node) > hdr->size ||
             hdr->kv_off + hdr->kv_nr * sizeof(struct img_kv) > hdr->size)
                 flags |= MAESTRO_VERR_IMAGE;

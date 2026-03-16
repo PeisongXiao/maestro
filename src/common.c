@@ -173,3 +173,20 @@ int ident_intern(struct strtab *tab, struct ident_vec *idents, const char *s,
         idents->nr++;
         return 0;
 }
+
+int path_vec_push(struct path_vec *vec, struct img_path path, uint32_t *idx) {
+        if (vec->nr == vec->cap) {
+                size_t ncap = vec->cap ? vec->cap * 2 : 64;
+                struct img_path *nv = realloc(vec->v, ncap * sizeof(*nv));
+
+                if (!nv)
+                        return -1;
+
+                vec->v = nv;
+                vec->cap = ncap;
+        }
+
+        *idx = (uint32_t)vec->nr;
+        vec->v[vec->nr++] = path;
+        return 0;
+}

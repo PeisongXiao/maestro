@@ -11,92 +11,92 @@ TEST_ROOT = ROOT / "tests" / "mstr"
 CASES = {
     "basics": [
         {
-            "module": "tests.basics.hello",
+            "module": "tests basics hello",
             "args": ["str:Ada"],
             "result": "hello Ada",
         },
     ],
     "bindings": [
         {
-            "module": "tests.bindings.main",
+            "module": "tests bindings main",
             "result": "5",
         },
     ],
     "control": [
         {
-            "module": "tests.control.main",
+            "module": "tests control main",
             "result": "ok",
         },
     ],
     "modules": [
         {
-            "module": "tests.modules.imports",
+            "module": "tests modules imports",
             "result": "import:wild",
         },
         {
-            "module": "tests.modules.caller",
+            "module": "tests modules caller",
             "result": "worker:Ada",
         },
     ],
     "state": [
         {
-            "module": "tests.state.last",
+            "module": "tests state last",
             "result": "alpha",
         },
         {
-            "module": "tests.state.handoff.src",
+            "module": "tests state handoff src",
             "result": "handoff",
         },
     ],
     "refs": [
         {
-            "module": "tests.refs.main",
+            "module": "tests refs main",
             "result": "42",
         },
     ],
     "predicates": [
         {
-            "module": "tests.predicates.main",
+            "module": "tests predicates main",
             "result": "[true,true,true,true,true,true,true,true,true,true,true,true,true]",
         },
     ],
     "arithmetic": [
         {
-            "module": "tests.arithmetic.main",
+            "module": "tests arithmetic main",
             "result": "[6,5,24,4,2,3,4]",
         },
     ],
     "strings": [
         {
-            "module": "tests.strings.main",
+            "module": "tests strings main",
             "result": "abc-3",
         },
     ],
     "lists": [
         {
-            "module": "tests.lists.main",
+            "module": "tests lists main",
             "result": "[1,2,3,4]",
         },
     ],
     "objects": [
         {
-            "module": "tests.objects.main",
+            "module": "tests objects main",
             "result": "1",
         },
     ],
     "json": [
         {
-            "module": "tests.json.main",
+            "module": "tests json main",
             "result": "38",
         },
         {
-            "module": "tests.json.parse",
+            "module": "tests json parse",
             "result": "5",
         },
     ],
     "output": [
         {
-            "module": "tests.output.main",
+            "module": "tests output main",
             "result": "7",
             "stdout": "out!",
             "stderr": "err!",
@@ -104,7 +104,7 @@ CASES = {
     ],
     "external": [
         {
-            "module": "tests.external.main",
+            "module": "tests external main",
             "result": "5",
             "externals": ["echo"],
         },
@@ -113,7 +113,7 @@ CASES = {
 
 
 def normalize_module(text: str) -> str:
-    return ".".join(part for part in text.replace(".", " ").split() if part)
+    return " ".join(part for part in text.replace(".", " ").split() if part)
 
 
 def parse_sections(text: str) -> dict[str, str]:

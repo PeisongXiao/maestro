@@ -67,7 +67,7 @@ build/maestroexts build/examples/external.mstro
 Run a module:
 
 ```sh
-build/maestrovm build/examples/modules.mstro app.caller
+build/maestrovm build/examples/modules.mstro "app caller"
 ```
 
 Run categorized source-program tests:

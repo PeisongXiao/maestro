@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
         char *text;
 
         if (argc != 3) {
-                fprintf(stderr, "usage: %s image.mstro module-path\n", argv[0]);
+                fprintf(stderr, "usage: %s image.mstro \"module path\"\n", argv[0]);
                 return 1;
         }
 

@@ -53,6 +53,9 @@ int maestro_run(maestro_ctx *ctx, const char *module_path,
 size_t maestro_list_externals(maestro_ctx *ctx, const char ***names);
 ```
 
+`module_path` is supplied as space-separated text at the public API
+boundary, matching Maestro source path shape.
+
 Parser diagnostics are written directly to `FILE *err`. Directory
 walking is not part of the parser library;
 [`build/maestroc`](../../build/maestroc) owns source discovery.
@@ -123,9 +126,10 @@ The current image layout is:
 2. module table
 3. external table
 4. identifier table
-5. node table
-6. JSON key/value table
-7. string table
+5. path table
+6. node table
+7. JSON key/value table
+8. string table
 
 The runtime is optimized around:
 
@@ -154,6 +158,8 @@ struct img_hdr {
 	uint32_t ext_nr;
 	uint32_t ident_off;
 	uint32_t ident_nr;
+	uint32_t path_off;
+	uint32_t path_nr;
 	uint32_t node_off;
 	uint32_t node_nr;
 	uint32_t kv_off;
@@ -186,6 +192,10 @@ bitmap. `maestro_validate()` checks that the VM capability bitmap in
 Required externals are recorded in a dedicated section before the node
 table. That allows fast inspection and validation without walking the
 code graph.
+
+Module paths are stored as segmented path tables in the image rather
+than flattened dotted strings. Resolution compares path segments
+directly, and human-facing rendering uses space-separated text.
 
 Inspection entrypoints:
 
@@ -224,7 +234,3 @@ The current implementation is intentionally minimal but end-to-end:
 - runtime values are opaque handles
 - inspection and diagnostics stay available through names and strings
   in the image
-
-The next major optimization step, if needed later, would be lowering
-the packed AST image into a denser execution format. That is not part
-of the current implementation.

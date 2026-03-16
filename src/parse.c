@@ -551,42 +551,14 @@ static bool is_valid_identifier(const char *s) {
         return true;
 }
 
-static char *join_node_path(maestro_ast_node *form, uint32_t start,
-                            uint32_t end) {
-        char *buf;
-        size_t len = 0;
-        uint32_t i;
-
-        if (end <= start || end > form->child_nr)
-                return NULL;
-
-        for (i = start; i < end; i++) {
-                if (!form->child[i]->text)
-                        return NULL;
-
-                len += strlen(form->child[i]->text) + (i + 1 < end ? 1U : 0U);
-        }
-
-        buf = malloc(len + 1);
-
-        if (!buf)
-                return NULL;
-
-        buf[0] = 0;
-
-        for (i = start; i < end; i++) {
-                strcat(buf, form->child[i]->text);
-
-                if (i + 1 < end)
-                        strcat(buf, ".");
-        }
-
-        return buf;
-}
-
-static char *extract_module_path(maestro_ast_node *root, FILE *err) {
+static int extract_module_path(maestro_ast_node *root, FILE *err,
+                               char ***seg_out,
+                               uint32_t *nr_out) {
         uint32_t found = 0;
         uint32_t i;
+
+        *seg_out = NULL;
+        *nr_out = 0;
 
         for (i = 0; i < root->child_nr; i++) {
                 maestro_ast_node *f = root->child[i];
@@ -595,34 +567,50 @@ static char *extract_module_path(maestro_ast_node *root, FILE *err) {
                         continue;
 
                 if (node_ident(f->child[0]) && !strcmp(node_ident(f->child[0]), "module")) {
-                        char *path;
+                        char **segv;
                         uint32_t j;
 
                         found++;
 
                         if (found > 1) {
                                 diagf(err, "multiple module statements are not allowed\n");
-                                return NULL;
+                                return -1;
                         }
 
                         for (j = 1; j < f->child_nr; j++) {
                                 if (f->child[j]->type != MAESTRO_AST_IDENT ||
                                     !is_valid_identifier(f->child[j]->text)) {
                                         diagf(err, "invalid module path segment\n");
-                                        return NULL;
+                                        return -1;
                                 }
                         }
 
-                        path = join_node_path(f, 1, f->child_nr);
+                        segv = calloc(f->child_nr - 1, sizeof(*segv));
 
-                        if (!path)
-                                return NULL;
+                        if (!segv)
+                                return -1;
 
-                        return path;
+                        for (j = 1; j < f->child_nr; j++) {
+                                segv[j - 1] = xstrdup(f->child[j]->text);
+
+                                if (!segv[j - 1]) {
+                                        while (j > 1) {
+                                                j--;
+                                                free(segv[j - 1]);
+                                        }
+
+                                        free(segv);
+                                        return -1;
+                                }
+                        }
+
+                        *seg_out = segv;
+                        *nr_out = f->child_nr - 1;
+                        return 0;
                 }
         }
 
-        return NULL;
+        return -1;
 }
 
 static void maestro_add_ast(maestro_asts *dest, maestro_ast *src) {
@@ -669,9 +657,15 @@ void maestro_asts_free(maestro_asts *asts) {
                 return;
 
         for (ast = asts->head; ast; ast = next) {
+                uint32_t i;
+
                 next = ast->next;
                 free(ast->src);
-                free(ast->module_path);
+
+                for (i = 0; i < ast->module_nr; i++)
+                        free(ast->module_seg[i]);
+
+                free(ast->module_seg);
                 ast_node_free(ast->root);
                 free(ast);
         }
@@ -707,9 +701,8 @@ int maestro_parse_file(maestro_asts *dest, FILE *err, const char *src) {
 
         ast->src = xstrdup(src);
         ast->root = root;
-        ast->module_path = extract_module_path(root, err);
 
-        if (!ast->module_path) {
+        if (extract_module_path(root, err, &ast->module_seg, &ast->module_nr)) {
                 diagf(err, "%s: missing module declaration\n", src);
                 free(buf);
                 ast_node_free(root);
@@ -717,6 +710,7 @@ int maestro_parse_file(maestro_asts *dest, FILE *err, const char *src) {
                 free(ast);
                 return MAESTRO_ERR_PARSE;
         }
+
 
         free(buf);
         maestro_add_ast(dest, ast);

@@ -64,7 +64,8 @@ struct maestro_ast_node {
 
 struct maestro_ast {
         char *src;
-        char *module_path;
+        char **module_seg;
+        uint32_t module_nr;
         maestro_ast_node *root;
         struct maestro_ast *next;
 };
@@ -103,12 +104,14 @@ struct maestro_ctx {
         const void *img_mods;
         const void *img_exts;
         const void *img_idents;
+        const void *img_paths;
         const void *img_nodes;
         const void *img_kv;
         const char *img_strs;
         uint32_t img_mod_nr;
         uint32_t img_ext_nr;
         uint32_t img_ident_nr;
+        uint32_t img_path_nr;
         uint32_t img_node_nr;
         uint32_t img_kv_nr;
         uint64_t vm_cap;
@@ -182,6 +185,8 @@ struct img_hdr {
         uint32_t ext_nr;
         uint32_t ident_off;
         uint32_t ident_nr;
+        uint32_t path_off;
+        uint32_t path_nr;
         uint32_t node_off;
         uint32_t node_nr;
         uint32_t kv_off;
@@ -191,7 +196,8 @@ struct img_hdr {
 };
 
 struct img_mod {
-        uint32_t path_str;
+        uint32_t path_first;
+        uint32_t path_nr;
         uint32_t src_str;
         uint32_t root_idx;
 };
@@ -205,6 +211,10 @@ struct img_ext {
 
 struct img_ident {
         uint32_t name_off;
+};
+
+struct img_path {
+        uint32_t ident_id;
 };
 
 struct module_scope {
@@ -258,6 +268,12 @@ struct ident_vec {
         size_t cap;
 };
 
+struct path_vec {
+        struct img_path *v;
+        size_t nr;
+        size_t cap;
+};
+
 struct strtab {
         char *buf;
         size_t len;
@@ -290,7 +306,7 @@ struct run_ctx {
 };
 
 struct resolve_frame {
-        const char *module_path;
+        uint32_t mod_idx;
         const char *name;
         struct resolve_frame *up;
 };
@@ -305,5 +321,6 @@ int mod_vec_push(struct mod_vec *vec, struct img_mod mod);
 int ext_vec_push(struct ext_vec *vec, struct img_ext ext, uint32_t *idx);
 int ident_intern(struct strtab *tab, struct ident_vec *idents, const char *s,
                  uint32_t *id);
+int path_vec_push(struct path_vec *vec, struct img_path path, uint32_t *idx);
 
 #endif

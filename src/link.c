@@ -34,17 +34,34 @@ static char *join_node_path(maestro_ast_node *form, uint32_t start,
                 strcat(buf, form->child[i]->text);
 
                 if (i + 1 < end)
-                        strcat(buf, ".");
+                        strcat(buf, " ");
         }
 
         return buf;
 }
 
-static maestro_ast *find_ast(maestro_asts *asts, const char *path) {
+static int ast_path_eq(maestro_ast *ast, maestro_ast_node *form, uint32_t start,
+                       uint32_t end) {
+        uint32_t i;
+
+        if (!ast || ast->module_nr != end - start)
+                return 0;
+
+        for (i = start; i < end; i++) {
+                if (!form->child[i]->text || strcmp(ast->module_seg[i - start],
+                                                    form->child[i]->text))
+                        return 0;
+        }
+
+        return 1;
+}
+
+static maestro_ast *find_ast(maestro_asts *asts, maestro_ast_node *form,
+                             uint32_t start, uint32_t end) {
         maestro_ast *ast;
 
         for (ast = asts->head; ast; ast = ast->next) {
-                if (!strcmp(ast->module_path, path))
+                if (ast_path_eq(ast, form, start, end))
                         return ast;
         }
 
@@ -116,7 +133,7 @@ static int validate_imports(FILE *err, maestro_asts *asts,
                 if (!strcmp(op, "import") && node->child_nr >= 3) {
                         char *mod = join_node_path(node, 1, node->child_nr - 1);
                         const char *name = node->child[node->child_nr - 1]->text;
-                        maestro_ast *ast = find_ast(asts, mod);
+                        maestro_ast *ast = find_ast(asts, node, 1, node->child_nr - 1);
 
                         if (!ast) {
                                 diagf(err, "missing import module %s\n", mod);
@@ -135,7 +152,7 @@ static int validate_imports(FILE *err, maestro_asts *asts,
 
                 if (!strcmp(op, "import-program") && node->child_nr >= 2) {
                         char *mod = join_node_path(node, 1, node->child_nr);
-                        maestro_ast *ast = find_ast(asts, mod);
+                        maestro_ast *ast = find_ast(asts, node, 1, node->child_nr);
 
                         if (!ast || !ast_has_state(ast, "start")) {
                                 diagf(err, "import-program target %s has no start state\n",
@@ -320,6 +337,7 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic,
         struct strtab tab = {0};
         struct ident_vec idents = {0};
         struct ext_vec exts = {0};
+        struct path_vec paths = {0};
         struct node_vec nodes = {0};
         struct kv_vec kvs = {0};
         struct mod_vec mods = {0};
@@ -329,14 +347,25 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic,
 
         for (ast = src->head; ast; ast = ast->next) {
                 struct img_mod mod = {0};
+                uint32_t i;
 
                 if (validate_imports(stderr, src, ast->root))
                         return MAESTRO_ERR_LINK;
 
-                if (strtab_add(&tab, ast->module_path, &mod.path_str))
-                        return MAESTRO_ERR_NOMEM;
+                mod.path_first = (uint32_t)paths.nr;
+                mod.path_nr = ast->module_nr;
 
-                if (strtab_add(&tab, ast->src ? ast->src : ast->module_path, &mod.src_str))
+                for (i = 0; i < ast->module_nr; i++) {
+                        struct img_path path = {0};
+
+                        if (ident_intern(&tab, &idents, ast->module_seg[i], &path.ident_id))
+                                return MAESTRO_ERR_NOMEM;
+
+                        if (path_vec_push(&paths, path, &off))
+                                return MAESTRO_ERR_NOMEM;
+                }
+
+                if (strtab_add(&tab, ast->src ? ast->src : "", &mod.src_str))
                         return MAESTRO_ERR_NOMEM;
 
                 if (serialize_node(ast->root, &tab, &idents, &nodes, &kvs, &mod.root_idx))
@@ -362,7 +391,9 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic,
         hdr.ext_nr = (uint32_t)exts.nr;
         hdr.ident_off = hdr.ext_off + (uint32_t)(exts.nr * sizeof(exts.v[0]));
         hdr.ident_nr = (uint32_t)idents.nr;
-        hdr.node_off = hdr.ident_off + (uint32_t)(idents.nr * sizeof(idents.v[0]));
+        hdr.path_off = hdr.ident_off + (uint32_t)(idents.nr * sizeof(idents.v[0]));
+        hdr.path_nr = (uint32_t)paths.nr;
+        hdr.node_off = hdr.path_off + (uint32_t)(paths.nr * sizeof(paths.v[0]));
         hdr.node_nr = (uint32_t)nodes.nr;
         hdr.kv_off = hdr.node_off + (uint32_t)(nodes.nr * sizeof(nodes.v[0]));
         hdr.kv_nr = (uint32_t)kvs.nr;
@@ -384,6 +415,9 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic,
             fwrite(idents.v, sizeof(idents.v[0]), idents.nr, dest) != idents.nr)
                 return MAESTRO_ERR_LINK;
 
+        if (paths.nr && fwrite(paths.v, sizeof(paths.v[0]), paths.nr, dest) != paths.nr)
+                return MAESTRO_ERR_LINK;
+
         if (nodes.nr && fwrite(nodes.v, sizeof(nodes.v[0]), nodes.nr, dest) != nodes.nr)
                 return MAESTRO_ERR_LINK;
 
@@ -400,6 +434,7 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic,
         free(nodes.v);
         free(kvs.v);
         free(mods.v);
+        free(paths.v);
         off = 0;
         (void)off;
         return 0;

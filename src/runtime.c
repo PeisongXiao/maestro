@@ -46,16 +46,121 @@ static struct img_mod *img_mod_by_idx(maestro_ctx *ctx, uint32_t idx) {
         return &((struct img_mod *)ctx->img_mods)[idx];
 }
 
-static struct img_mod *find_mod(maestro_ctx *ctx, const char *path) {
+static const struct img_path *img_path_by_idx(maestro_ctx *ctx, uint32_t idx) {
+        if (idx >= ctx->img_path_nr)
+                return NULL;
+
+        return &((const struct img_path *)ctx->img_paths)[idx];
+}
+
+static int mod_path_eq(maestro_ctx *ctx, struct img_mod *mod, const char **seg,
+                       size_t nr) {
+        size_t i;
+
+        if (!mod || mod->path_nr != nr)
+                return 0;
+
+        for (i = 0; i < nr; i++) {
+                const struct img_path *path = img_path_by_idx(ctx, mod->path_first + i);
+
+                if (!path || strcmp(img_ident_name(ctx, path->ident_id), seg[i]))
+                        return 0;
+        }
+
+        return 1;
+}
+
+static int split_path_text(const char *text, char ***seg_out, size_t *nr_out) {
+        char *copy;
+        char *tok;
+        char *save;
+        char **segv = NULL;
+        size_t nr = 0;
+        size_t cap = 0;
+
+        *seg_out = NULL;
+        *nr_out = 0;
+
+        if (!text)
+                return -1;
+
+        copy = xstrdup(text);
+
+        if (!copy)
+                return -1;
+
+        for (tok = strtok_r(copy, " \t\r\n", &save); tok;
+             tok = strtok_r(NULL, " \t\r\n", &save)) {
+                if (nr == cap) {
+                        size_t ncap = cap ? cap * 2 : 8;
+                        char **nseg = realloc(segv, ncap * sizeof(*nseg));
+
+                        if (!nseg) {
+                                free(copy);
+
+                                while (nr)
+                                        free(segv[--nr]);
+
+                                free(segv);
+                                return -1;
+                        }
+
+                        segv = nseg;
+                        cap = ncap;
+                }
+
+                segv[nr] = xstrdup(tok);
+
+                if (!segv[nr]) {
+                        free(copy);
+
+                        while (nr)
+                                free(segv[--nr]);
+
+                        free(segv);
+                        return -1;
+                }
+
+                nr++;
+        }
+
+        free(copy);
+        *seg_out = segv;
+        *nr_out = nr;
+        return nr ? 0 : -1;
+}
+
+static void free_path_text(char **segv, size_t nr) {
+        while (nr)
+                free(segv[--nr]);
+
+        free(segv);
+}
+
+static struct img_mod *find_mod_by_seg(maestro_ctx *ctx, const char **seg,
+                                       size_t nr) {
         uint32_t i;
         struct img_mod *mods = (struct img_mod *)ctx->img_mods;
 
         for (i = 0; i < ctx->img_mod_nr; i++) {
-                if (!strcmp(img_str(ctx, mods[i].path_str), path))
+                if (mod_path_eq(ctx, &mods[i], seg, nr))
                         return &mods[i];
         }
 
         return NULL;
+}
+
+static struct img_mod *find_mod(maestro_ctx *ctx, const char *path) {
+        struct img_mod *mod;
+        char **segv = NULL;
+        size_t nr = 0;
+
+        if (split_path_text(path, &segv, &nr))
+                return NULL;
+
+        mod = find_mod_by_seg(ctx, (const char **)segv, nr);
+        free_path_text(segv, nr);
+        return mod;
 }
 
 static uint32_t find_mod_idx(maestro_ctx *ctx, struct img_mod *mod) {
@@ -1017,43 +1122,42 @@ static struct module_scope *module_scope_get(struct run_ctx *rctx,
         return ms;
 }
 
-static char *join_img_path(struct run_ctx *rctx, struct img_node *form,
-                           uint32_t start, uint32_t end) {
-        char *buf;
-        size_t len = 0;
+static int mod_path_eq_form(struct run_ctx *rctx, struct img_mod *mod,
+                            struct img_node *form, uint32_t start, uint32_t end) {
         uint32_t i;
 
-        if (end <= start || end > form->nr)
-                return NULL;
+        if (!mod || end <= start || end > form->nr || mod->path_nr != end - start)
+                return 0;
 
         for (i = start; i < end; i++) {
                 struct img_node *seg = img_node(rctx->ctx, form->first + i);
-                const char *s;
 
                 if (seg->type != IMG_NODE_IDENT && seg->type != IMG_NODE_STRING)
-                        return NULL;
+                        return 0;
 
-                s = node_text(rctx->ctx, seg);
-                len += strlen(s) + (i + 1 < end ? 1U : 0U);
+                if (strcmp(node_text(rctx->ctx, seg),
+                           img_ident_name(rctx->ctx,
+                                          img_path_by_idx(rctx->ctx,
+                                                          mod->path_first + i - start)->ident_id)))
+                        return 0;
         }
 
-        buf = malloc(len + 1);
+        return 1;
+}
 
-        if (!buf)
-                return NULL;
+static struct img_mod *find_mod_from_form(struct run_ctx *rctx,
+                struct img_node *form,
+                uint32_t start, uint32_t end) {
+        uint32_t i;
 
-        buf[0] = 0;
+        for (i = 0; i < rctx->ctx->img_mod_nr; i++) {
+                struct img_mod *mod = img_mod_by_idx(rctx->ctx, i);
 
-        for (i = start; i < end; i++) {
-                struct img_node *seg = img_node(rctx->ctx, form->first + i);
-
-                strcat(buf, node_text(rctx->ctx, seg));
-
-                if (i + 1 < end)
-                        strcat(buf, ".");
+                if (mod_path_eq_form(rctx, mod, form, start, end))
+                        return mod;
         }
 
-        return buf;
+        return NULL;
 }
 
 static maestro_value make_handle(struct run_ctx *rctx, struct img_mod *mod,
@@ -1106,10 +1210,10 @@ static maestro_value make_handle(struct run_ctx *rctx, struct img_mod *mod,
                         MAESTRO_VAL_MACRO);
 }
 
-static bool resolving(struct resolve_frame *frame, const char *module_path,
+static bool resolving(struct resolve_frame *frame, uint32_t mod_idx,
                       const char *name) {
         for (; frame; frame = frame->up) {
-                if (!strcmp(frame->module_path, module_path) && !strcmp(frame->name, name))
+                if (frame->mod_idx == mod_idx && !strcmp(frame->name, name))
                         return true;
         }
 
@@ -1123,7 +1227,6 @@ static maestro_value resolve_import(struct run_ctx *rctx,
                                     struct img_mod *mod_unused,
                                     struct img_node *form, const char *name,
                                     struct resolve_frame *frame) {
-        char *path;
         struct img_mod *target;
         const char *import_name;
         maestro_value v = v_invalid();
@@ -1132,12 +1235,7 @@ static maestro_value resolve_import(struct run_ctx *rctx,
                 return v_invalid();
 
         (void)mod_unused;
-        path = join_img_path(rctx, form, 1, form->nr - 1);
-
-        if (!path)
-                return v_invalid();
-
-        target = find_mod(rctx->ctx, path);
+        target = find_mod_from_form(rctx, form, 1, form->nr - 1);
         import_name = node_text(rctx->ctx,
                                 img_node(rctx->ctx, form->first + form->nr - 1));
 
@@ -1148,7 +1246,6 @@ static maestro_value resolve_import(struct run_ctx *rctx,
                         v = resolve_global(rctx, target, import_name, frame);
         }
 
-        free(path);
         return v;
 }
 
@@ -1160,7 +1257,7 @@ static maestro_value resolve_global(struct run_ctx *rctx, struct img_mod *mod,
         uint32_t ident_id = find_ident_id_by_name(rctx->ctx, name);
         uint32_t i;
         struct resolve_frame next = {
-                .module_path = img_str(rctx->ctx, mod->path_str),
+                .mod_idx = find_mod_idx(rctx->ctx, mod),
                 .name = name,
                 .up = frame,
         };
@@ -1173,7 +1270,7 @@ static maestro_value resolve_global(struct run_ctx *rctx, struct img_mod *mod,
         if (b)
                 return b->value;
 
-        if (resolving(frame, next.module_path, name))
+        if (resolving(frame, next.mod_idx, name))
                 return v_invalid();
 
         if (is_builtin_name(name))
@@ -1832,8 +1929,7 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
         }
 
         if (!strcmp(op, "import") && node->nr >= 3) {
-                char *path = join_img_path(rctx, node, 1, node->nr - 1);
-                struct img_mod *m = find_mod(rctx->ctx, path);
+                struct img_mod *m = find_mod_from_form(rctx, node, 1, node->nr - 1);
                 const char *name = node_text(rctx->ctx,
                                              img_node(rctx->ctx, node->first + node->nr - 1));
 
@@ -1841,24 +1937,21 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                         return v_invalid();
 
                 out = eval_ident(rctx, m, NULL, name);
-                free(path);
                 return out;
         }
 
         if (!strcmp(op, "import-program") && node->nr >= 2) {
                 struct maestro_handle *h = rctx->ctx->alloc(sizeof(*h));
-                char *path = join_img_path(rctx, node, 1, node->nr);
-                struct img_mod *prog_mod = path ? find_mod(rctx->ctx, path) : NULL;
+                struct img_mod *prog_mod = find_mod_from_form(rctx, node, 1, node->nr);
                 uint32_t start_id = find_ident_id_by_name(rctx->ctx, "start");
 
-                if (!h || !path || !prog_mod || start_id == UINT32_MAX)
+                if (!h || !prog_mod || start_id == UINT32_MAX)
                         return v_invalid();
 
                 memset(h, 0, sizeof(*h));
                 h->kind = HANDLE_PROGRAM;
                 h->module_idx = find_mod_idx(rctx->ctx, prog_mod);
                 h->name_id = start_id;
-                free(path);
                 return v_handle(h, MAESTRO_VAL_PROGRAM);
         }
 

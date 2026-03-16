@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
         int i;
 
         if (argc < 3) {
-                fprintf(stderr, "usage: %s image.mstro module.path [arg...]\n", argv[0]);
+                fprintf(stderr, "usage: %s image.mstro \"module path\" [arg...]\n", argv[0]);
                 return 2;
         }
 

@@ -311,13 +311,13 @@ int main(void) {
         };
         static const struct run_case runs[] = {
                 { "sample", "hello Ada" },
-                { "app.imports", "import:wild" },
-                { "app.refs", "42" },
-                { "app.last", "alpha" },
-                { "app.caller", "worker:Ada" },
-                { "app.json", "38" },
-                { "app.handoff.src", "handoff" },
-                { "app.external", "5" },
+                { "app imports", "import:wild" },
+                { "app refs", "42" },
+                { "app last", "alpha" },
+                { "app caller", "worker:Ada" },
+                { "app json", "38" },
+                { "app handoff src", "handoff" },
+                { "app external", "5" },
         };
         const char *srcs[sizeof(files) / sizeof(files[0])];
         maestro_asts *asts;
@@ -352,7 +352,7 @@ int main(void) {
         if (ret)
                 return 1;
 
-        fp = fopen("examples/all.mstro", "wb");
+        fp = fopen("build/smoke.mstro", "wb");
 
         if (!fp)
                 return 1;
@@ -363,7 +363,7 @@ int main(void) {
         if (ret)
                 return 1;
 
-        img = slurp("examples/all.mstro", &len);
+        img = slurp("build/smoke.mstro", &len);
 
         if (!img)
                 return 1;
@@ -400,7 +400,7 @@ int main(void) {
                         return 1;
         }
 
-        if (run_case_check_args(ctx, "app.worker", "worker:Ada"))
+        if (run_case_check_args(ctx, "app worker", "worker:Ada"))
                 return 1;
 
         maestro_ctx_free(ctx);
