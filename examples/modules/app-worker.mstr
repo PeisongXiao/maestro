@@ -1,0 +1,4 @@
+(module app worker)
+(state (start name)
+  (steps
+    (transition end (concat "worker:" name))))

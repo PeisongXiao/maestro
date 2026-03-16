@@ -1,0 +1,4 @@
+(module tests basics hello)
+(state (start who)
+  (steps
+    (transition end (concat "hello " who))))

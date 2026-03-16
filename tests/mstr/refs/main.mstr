@@ -1,0 +1,9 @@
+(module tests refs main)
+(define (inc (ref x)) (set x (+ x 1)))
+(state (start)
+  (steps
+    (let user empty-object)
+    (set user age 41)
+    (let age (ref user age))
+    (inc age)
+    (transition end (get user age))))

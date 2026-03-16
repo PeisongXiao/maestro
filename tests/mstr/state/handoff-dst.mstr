@@ -1,0 +1,5 @@
+(module tests state handoff dst)
+(export done)
+(state (done)
+  (steps
+    (transition end "handoff")))

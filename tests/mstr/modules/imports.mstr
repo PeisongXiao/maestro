@@ -1,0 +1,6 @@
+(module tests modules imports)
+(import tests modules lib strings copy)
+(import tests modules lib strings *)
+(state (start)
+  (steps
+    (transition end (concat (copy "im" "port") ":" answer))))

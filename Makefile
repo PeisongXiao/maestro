@@ -1,0 +1,106 @@
+CC ?= cc
+CFLAGS ?= -Wall -Wextra -Werror -std=c11 -O2
+CPPFLAGS ?= -Iinclude
+LDFLAGS ?=
+
+BUILD_DIR := build
+OBJ_DIR := $(BUILD_DIR)/obj
+
+LIB_OBJS = \
+	$(OBJ_DIR)/common.o \
+	$(OBJ_DIR)/parse.o \
+	$(OBJ_DIR)/link.o \
+	$(OBJ_DIR)/runtime_api.o \
+	$(OBJ_DIR)/runtime.o
+TOOLS = $(BUILD_DIR)/maestroc $(BUILD_DIR)/maestrovm
+TOOLS += $(BUILD_DIR)/maestroexts
+TESTS = $(BUILD_DIR)/smoke $(BUILD_DIR)/hostrun
+EXAMPLE_CATS := basics external json modules refs state
+EXAMPLE_ARTIFACTS := $(patsubst %,$(BUILD_DIR)/examples/%.mstro,$(EXAMPLE_CATS))
+
+.PHONY: all clean test runtime tools examples test-mstr
+
+all: runtime tools $(TESTS)
+
+runtime: $(BUILD_DIR)/libmaestro.a $(BUILD_DIR)/maestrovm
+
+tools: $(BUILD_DIR)/maestroc $(BUILD_DIR)/maestroexts
+
+examples: tools $(EXAMPLE_ARTIFACTS)
+
+$(BUILD_DIR)/libmaestro.a: $(LIB_OBJS)
+	@mkdir -p $(BUILD_DIR)
+	$(AR) rcs $@ $(LIB_OBJS)
+
+$(OBJ_DIR)/common.o: src/common.c src/maestro_int.h include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/parse.o: src/parse.c src/maestro_int.h include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/link.o: src/link.c src/maestro_int.h include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/runtime_api.o: src/runtime_api.c src/maestro_int.h include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/runtime.o: src/runtime.c src/maestro_int.h include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/maestroc.o: tools/maestroc.c include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/maestrovm.o: tools/maestrovm.c include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/maestroexts.o: tools/maestroexts.c include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/smoke.o: tests/smoke.c include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(OBJ_DIR)/hostrun.o: tests/hostrun.c include/maestro/maestro.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/maestroc: $(OBJ_DIR)/maestroc.o $(BUILD_DIR)/libmaestro.a
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(LDFLAGS) -o $@ $(OBJ_DIR)/maestroc.o $(BUILD_DIR)/libmaestro.a -lm
+
+$(BUILD_DIR)/maestrovm: $(OBJ_DIR)/maestrovm.o $(BUILD_DIR)/libmaestro.a
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(LDFLAGS) -o $@ $(OBJ_DIR)/maestrovm.o $(BUILD_DIR)/libmaestro.a -lm
+
+$(BUILD_DIR)/maestroexts: $(OBJ_DIR)/maestroexts.o $(BUILD_DIR)/libmaestro.a
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(LDFLAGS) -o $@ $(OBJ_DIR)/maestroexts.o $(BUILD_DIR)/libmaestro.a -lm
+
+$(BUILD_DIR)/smoke: $(OBJ_DIR)/smoke.o $(BUILD_DIR)/libmaestro.a
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(LDFLAGS) -o $@ $(OBJ_DIR)/smoke.o $(BUILD_DIR)/libmaestro.a -lm
+
+$(BUILD_DIR)/hostrun: $(OBJ_DIR)/hostrun.o $(BUILD_DIR)/libmaestro.a
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(LDFLAGS) -o $@ $(OBJ_DIR)/hostrun.o $(BUILD_DIR)/libmaestro.a -lm
+
+$(BUILD_DIR)/examples/%.mstro: $(BUILD_DIR)/maestroc
+	@mkdir -p $(BUILD_DIR)/examples
+	./$(BUILD_DIR)/maestroc -d examples/$* -o $@
+
+test: all
+	./$(BUILD_DIR)/smoke
+
+test-mstr: tools $(BUILD_DIR)/hostrun
+	python3 tests/run_tests.py
+
+clean:
+	rm -rf $(BUILD_DIR)

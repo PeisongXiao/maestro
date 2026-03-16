@@ -1,0 +1,9 @@
+(module tests control main)
+(state (start)
+  (steps
+    (let x 2)
+    (transition end
+      (case
+        ((< x 2) "low")
+        ((= x 2) "ok")
+        (default "high")))))

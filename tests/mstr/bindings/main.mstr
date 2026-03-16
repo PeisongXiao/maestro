@@ -1,0 +1,7 @@
+(module tests bindings main)
+(state (start)
+  (steps
+    (let x 1)
+    (let x 2)
+    (set x (+ x 3))
+    (transition end x)))

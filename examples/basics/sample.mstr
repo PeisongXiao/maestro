@@ -1,0 +1,6 @@
+(module sample)
+(state (start)
+  (steps
+    (let user empty-object)
+    (set user name "Ada")
+    (transition end (concat "hello " (get user name)))))

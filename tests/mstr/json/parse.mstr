@@ -1,0 +1,5 @@
+(module tests json parse)
+(state (start)
+  (steps
+    (let obj (json-parse "{\"n\":5,\"s\":\"ok\"}"))
+    (transition end (get obj n))))

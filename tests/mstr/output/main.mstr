@@ -1,0 +1,6 @@
+(module tests output main)
+(state (start)
+  (steps
+    (print "out!")
+    (log "err!")
+    (transition end 7)))

@@ -1,0 +1,4 @@
+(module tests modules worker)
+(state (start name)
+  (steps
+    (transition end (concat "worker:" name))))

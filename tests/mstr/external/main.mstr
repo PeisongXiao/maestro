@@ -1,0 +1,5 @@
+(module tests external main)
+(define (echo msg) external)
+(state (start)
+  (steps
+    (transition end (echo "hello"))))

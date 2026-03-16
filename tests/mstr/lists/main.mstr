@@ -1,0 +1,4 @@
+(module tests lists main)
+(state (start)
+  (steps
+    (transition end (cons 1 (cons 2 (list 3 4))))))

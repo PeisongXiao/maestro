@@ -1,0 +1,22 @@
+(module tests predicates main)
+(define (helper x) x)
+(state (start)
+  (steps
+    (let bag empty-object)
+    (set bag n 1)
+    (let r (ref bag n))
+    (transition end
+      (list
+        (empty? empty-string)
+        (number? 3)
+        (integer? 3)
+        (float? 1.5)
+        (string? "x")
+        (list? (list 1))
+        (object? bag)
+        (symbol? 'x)
+        (boolean? true)
+        (ref? r)
+        (state? start)
+        (macro? helper)
+        (ref=? start start)))))
