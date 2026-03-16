@@ -93,6 +93,14 @@ CASES = {
             "module": "tests json parse",
             "result": "5",
         },
+        {
+            "module": "tests json serialize",
+            "result": "{\"age\":38,\"name\":\"Ada\"}",
+        },
+        {
+            "module": "tests json invalid",
+            "error": True,
+        },
     ],
     "output": [
         {
@@ -191,6 +199,15 @@ def main(argv: list[str]) -> int:
                 check_externals(artifact, case["externals"])
             cmd = [str(BUILD / "hostrun"), str(artifact), case["module"], *case.get("args", [])]
             res = run(cmd, ROOT)
+            if case.get("error"):
+                if res.returncode == 0:
+                    raise SystemExit(f"expected runtime error for {case['module']}")
+                print(f"ok {case['module']}")
+                print("  result: <runtime error>")
+                print(f"  stdout: {res.stdout!r}")
+                print(f"  stderr: {res.stderr!r}")
+                total += 1
+                continue
             if res.returncode:
                 sys.stderr.write(res.stdout)
                 sys.stderr.write(res.stderr)

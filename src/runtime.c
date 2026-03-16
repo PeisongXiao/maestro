@@ -288,6 +288,8 @@ static int obj_set(maestro_ctx *ctx, struct maestro_object *obj,
                    maestro_value v);
 static int parse_json_value(maestro_ctx *ctx, struct json_cursor *cur,
                             maestro_value *out);
+static int json_snippet_value_ok(maestro_value v);
+static int json_serialize_value_ok(maestro_value v);
 
 static int list_push(maestro_ctx *ctx, struct maestro_list *list,
                      maestro_value v) {
@@ -890,6 +892,255 @@ static int json_parse_text(maestro_ctx *ctx, const char *text,
         return *cur.s ? -1 : 0;
 }
 
+static int json_parse_object_text(maestro_ctx *ctx, const char *text,
+                                  maestro_value *out) {
+        if (json_parse_text(ctx, text, out))
+                return -1;
+
+        return out->type == MAESTRO_VAL_OBJECT ? 0 : -1;
+}
+
+static int json_snippet_value_ok(maestro_value v) {
+        size_t i;
+
+        switch (v.type) {
+        case MAESTRO_VAL_INT:
+        case MAESTRO_VAL_FLOAT:
+        case MAESTRO_VAL_STRING:
+                return 1;
+
+        case MAESTRO_VAL_LIST:
+                if (!v.v.list)
+                        return 0;
+
+                for (i = 0; i < v.v.list->nr; i++) {
+                        if (v.v.list->item[i].type == MAESTRO_VAL_SYMBOL ||
+                            !json_snippet_value_ok(v.v.list->item[i]))
+                                return 0;
+                }
+
+                return 1;
+
+        case MAESTRO_VAL_OBJECT:
+                if (!v.v.obj)
+                        return 0;
+
+                for (i = 0; i < v.v.obj->nr; i++) {
+                        if (!json_snippet_value_ok(v.v.obj->val[i]))
+                                return 0;
+                }
+
+                return 1;
+
+        default:
+                return 0;
+        }
+}
+
+static int json_serialize_value_ok(maestro_value v) {
+        size_t i;
+
+        switch (v.type) {
+        case MAESTRO_VAL_INT:
+        case MAESTRO_VAL_FLOAT:
+        case MAESTRO_VAL_STRING:
+        case MAESTRO_VAL_BOOL:
+                return 1;
+
+        case MAESTRO_VAL_LIST:
+                if (!v.v.list)
+                        return 0;
+
+                for (i = 0; i < v.v.list->nr; i++) {
+                        if (!json_serialize_value_ok(v.v.list->item[i]))
+                                return 0;
+                }
+
+                return 1;
+
+        case MAESTRO_VAL_OBJECT:
+                if (!v.v.obj)
+                        return 0;
+
+                for (i = 0; i < v.v.obj->nr; i++) {
+                        if (!json_serialize_value_ok(v.v.obj->val[i]))
+                                return 0;
+                }
+
+                return 1;
+
+        default:
+                return 0;
+        }
+}
+
+struct json_buf {
+        char *buf;
+        size_t len;
+        size_t cap;
+};
+
+static int json_buf_append(struct json_buf *buf, const char *s) {
+        size_t add = strlen(s);
+        char *nbuf;
+
+        if (buf->len + add + 1 <= buf->cap) {
+                memcpy(buf->buf + buf->len, s, add + 1);
+                buf->len += add;
+                return 0;
+        }
+
+        {
+                size_t ncap = buf->cap ? buf->cap * 2 : 64;
+
+                while (ncap < buf->len + add + 1)
+                        ncap *= 2;
+
+                nbuf = realloc(buf->buf, ncap);
+
+                if (!nbuf)
+                        return -1;
+
+                buf->buf = nbuf;
+                buf->cap = ncap;
+        }
+
+        memcpy(buf->buf + buf->len, s, add + 1);
+        buf->len += add;
+        return 0;
+}
+
+static int json_buf_append_ch(struct json_buf *buf, char ch) {
+        char tmp[2] = { ch, 0 };
+
+        return json_buf_append(buf, tmp);
+}
+
+static int json_buf_append_escaped(struct json_buf *buf, const char *s) {
+        if (json_buf_append_ch(buf, '"'))
+                return -1;
+
+        while (*s) {
+                switch (*s) {
+                case '"':
+                        if (json_buf_append(buf, "\\\""))
+                                return -1;
+
+                        break;
+
+                case '\\':
+                        if (json_buf_append(buf, "\\\\"))
+                                return -1;
+
+                        break;
+
+                case '\b':
+                        if (json_buf_append(buf, "\\b"))
+                                return -1;
+
+                        break;
+
+                case '\f':
+                        if (json_buf_append(buf, "\\f"))
+                                return -1;
+
+                        break;
+
+                case '\n':
+                        if (json_buf_append(buf, "\\n"))
+                                return -1;
+
+                        break;
+
+                case '\r':
+                        if (json_buf_append(buf, "\\r"))
+                                return -1;
+
+                        break;
+
+                case '\t':
+                        if (json_buf_append(buf, "\\t"))
+                                return -1;
+
+                        break;
+
+                default:
+                        if (json_buf_append_ch(buf, *s))
+                                return -1;
+
+                        break;
+                }
+
+                s++;
+        }
+
+        return json_buf_append_ch(buf, '"');
+}
+
+static int json_serialize_value(struct json_buf *buf, maestro_value v) {
+        size_t i;
+        char tmp[64];
+
+        switch (v.type) {
+        case MAESTRO_VAL_INT:
+                snprintf(tmp, sizeof(tmp), "%lld", (long long)v.v.i);
+                return json_buf_append(buf, tmp);
+
+        case MAESTRO_VAL_FLOAT:
+                snprintf(tmp, sizeof(tmp), "%g", (double)v.v.f);
+                return json_buf_append(buf, tmp);
+
+        case MAESTRO_VAL_BOOL:
+                return json_buf_append(buf, v.v.b ? "true" : "false");
+
+        case MAESTRO_VAL_STRING:
+                return json_buf_append_escaped(buf, v.v.s ? v.v.s : "");
+
+        case MAESTRO_VAL_LIST:
+                if (json_buf_append_ch(buf, '['))
+                        return -1;
+
+                for (i = 0; i < v.v.list->nr; i++) {
+                        if ((i && json_buf_append_ch(buf, ',')) ||
+                            json_serialize_value(buf, v.v.list->item[i]))
+                                return -1;
+                }
+
+                return json_buf_append_ch(buf, ']');
+
+        case MAESTRO_VAL_OBJECT:
+                if (json_buf_append_ch(buf, '{'))
+                        return -1;
+
+                for (i = 0; i < v.v.obj->nr; i++) {
+                        if ((i && json_buf_append_ch(buf, ',')) ||
+                            json_buf_append_escaped(buf, v.v.obj->key[i]) ||
+                            json_buf_append_ch(buf, ':') ||
+                            json_serialize_value(buf, v.v.obj->val[i]))
+                                return -1;
+                }
+
+                return json_buf_append_ch(buf, '}');
+
+        default:
+                return -1;
+        }
+}
+
+static char *json_serialize_object(maestro_value v) {
+        struct json_buf buf = {0};
+
+        if (v.type != MAESTRO_VAL_OBJECT || !json_serialize_value_ok(v))
+                return NULL;
+
+        if (json_serialize_value(&buf, v)) {
+                free(buf.buf);
+                return NULL;
+        }
+
+        return buf.buf;
+}
+
 static bool value_truthy(maestro_value v) {
         switch (v.type) {
         case MAESTRO_VAL_BOOL:
@@ -1076,7 +1327,7 @@ static maestro_value run_state(struct run_ctx *rctx, struct img_mod *mod,
 
 static bool is_builtin_name(const char *name) {
         static const char *const builtins[] = {
-                "list", "cons", "json", "json-list", "json-parse",
+                "list", "cons", "json", "json-parse",
                 "and", "or", "not", "+", "-", "*", "/", "%",
                 "=", "!=", "<", "<=", ">", ">=", "ref=?",
                 "concat", "substr", "to-string", "floor", "ceil",
@@ -1475,38 +1726,11 @@ static maestro_value eval_json(struct run_ctx *rctx, struct img_mod *mod,
         for (i = 0; i < node->nr; i++) {
                 struct img_kv *kv = &((struct img_kv *)rctx->ctx->img_kv)[node->first + i];
                 maestro_value v = eval_node(rctx, mod, scope, kv->val_idx, eres);
-                char *json = NULL;
 
-                if (v.type == MAESTRO_VAL_SYMBOL) {
+                if (!json_snippet_value_ok(v)) {
                         maestro_value_reset(rctx->ctx, &obj);
                         return v_invalid();
                 }
-
-                if (v.type == MAESTRO_VAL_LIST) {
-                        size_t j;
-                        bool sym_list = true;
-
-                        for (j = 0; j < v.v.list->nr; j++) {
-                                if (v.v.list->item[j].type != MAESTRO_VAL_SYMBOL) {
-                                        sym_list = false;
-                                        break;
-                                }
-                        }
-
-                        if (sym_list) {
-                                maestro_value nv = v_list(rctx->ctx);
-
-                                for (j = 0; j < v.v.list->nr; j++)
-                                        list_push(rctx->ctx, nv.v.list,
-                                                  v_string(rctx->ctx,
-                                                           v.v.list->item[j].v.s));
-
-                                v = nv;
-                        }
-                }
-
-                json = maestro_value_stringify(rctx->ctx, v);
-                free(json);
 
                 if (obj_set(rctx->ctx, obj.v.obj, img_str(rctx->ctx, kv->key_off), v)) {
                         maestro_value_reset(rctx->ctx, &obj);
@@ -1981,11 +2205,17 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 return out;
         }
 
-        if (!strcmp(op, "json") && node->nr == 2)
-                return eval_node(rctx, mod, scope, node->first + 1, eres);
+        if (!strcmp(op, "json") && node->nr == 2) {
+                maestro_value obj = eval_node(rctx, mod, scope, node->first + 1, eres);
+                char *json = json_serialize_object(obj);
 
-        if (!strcmp(op, "json-list") && node->nr == 2)
-                return eval_node(rctx, mod, scope, node->first + 1, eres);
+                if (!json)
+                        return v_invalid();
+
+                out = v_string(rctx->ctx, json);
+                free(json);
+                return out;
+        }
 
         if (!strcmp(op, "json-parse") && node->nr == 2) {
                 maestro_value s = eval_node(rctx, mod, scope, node->first + 1, eres);
@@ -1993,7 +2223,7 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 if (s.type != MAESTRO_VAL_STRING)
                         return v_invalid();
 
-                if (json_parse_text(rctx->ctx, s.v.s, &out))
+                if (json_parse_object_text(rctx->ctx, s.v.s, &out))
                         return v_invalid();
 
                 return out;
@@ -2523,6 +2753,12 @@ int maestro_run(maestro_ctx *ctx, const char *module_path, maestro_value **args,
         }
 
         raw = run_state(&rctx, mod, start.v.handle, argv, argc);
+
+        if (raw.type == MAESTRO_VAL_INVALID) {
+                ret = MAESTRO_ERR_RUNTIME;
+                goto out;
+        }
+
         **result = clone_value(ctx, raw);
 
         if ((*result)->type == MAESTRO_VAL_INVALID && raw.type != MAESTRO_VAL_INVALID) {
@@ -2627,7 +2863,7 @@ maestro_value *maestro_value_new_json(maestro_ctx *ctx,
         if (!v)
                 return NULL;
 
-        if (json_parse_text(ctx, json_snippet ? json_snippet : "", v)) {
+        if (json_parse_object_text(ctx, json_snippet ? json_snippet : "", v)) {
                 maestro_value_reset(ctx, v);
                 return NULL;
         }

@@ -2,5 +2,5 @@
 (state (start)
   (steps
     (let age 37)
-    (let user {"name":"Ada","age":(+ age 1),"tags":(list 'x 'y)})
+    (let user {"name":"Ada","age":(+ age 1),"tags":(list "x" "y")})
     (transition end (get user age))))

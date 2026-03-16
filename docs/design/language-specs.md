@@ -602,18 +602,19 @@ object snippet produces a data object.
 JSON snippets may contain Maestro code in value position, including
 function calls and value references.
 
+JSON snippets are source forms delimited by `{` and the matching `}`.
+
 JSON snippets may only evaluate to:
 
 - numbers
 - strings
-- lists containing valid JSON snippet values
+- lists containing valid JSON snippet values, excluding lists of
+  symbols
 - data objects containing valid JSON snippet values
 
 This is checked at runtime.
 
-JSON snippets may not contain symbols, with one exception: a list of
-symbols such as `(list 'sym-a 'sym-b)` may be evaluated as a list of
-strings.
+JSON snippets may not contain symbols.
 
 JSON snippet strings follow JSON-style escaping more closely than
 ordinary Maestro strings. They support:
@@ -659,16 +660,7 @@ Example:
 'closed
 ```
 
-A lone symbol does not map cleanly to JSON. A list of symbols exported
-to JSON becomes a list of string values.
-
-Example:
-
-```lisp
-(list 'open 'closed)
-```
-
-becomes:
+A lone symbol does not map cleanly to JSON.
 
 ```json
 ["open", "closed"]
@@ -1183,40 +1175,29 @@ Maestro provides the following JSON helpers:
 
 - `json-parse`
 - `json`
-- `json-list`
 
 These are meant to help interop with the outside world.
 
 `json-parse` parses a JSON object provided as a string and returns a
-data object.
+data object. Invalid input is a runtime error.
 
-`json` accepts an inline JSON object snippet and returns a data
-object.  JSON snippets may contain Maestro code in value position.
-JSON snippet values are checked at runtime and may only evaluate to
-numbers, strings, lists containing valid JSON snippet values, or data
-objects containing valid JSON snippet values.  JSON snippets may not
-contain symbols, except that a list of symbols may be evaluated as a
-list of strings.
-
-`json-list` accepts a Maestro list and returns a JSON array value.
+`json` accepts a valid Maestro data object and returns an unformatted
+JSON string. The object must only contain JSON-serializable values.
+Invalid input is a runtime error.
 
 Examples:
 
 ```lisp
 (json-parse "{\"name\":\"Ada\"}")
 (json {"name":"Ada","age":37})
-(json {"name":"Ada","age":(+ 30 7)})
-(json-list (list 1 2 3))
+(let user {"name":"Ada","age":(+ 30 7)})
+(json user)
 ```
 
 Generated JSON examples:
 
 ```json
 {"name":"Ada","age":37}
-```
-
-```json
-[1,2,3]
 ```
 
 ## Usage Examples

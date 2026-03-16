@@ -279,7 +279,7 @@ int main(void) {
                         "(state (start)\n"
                         "  (steps\n"
                         "    (let age 37)\n"
-                        "    (let user {\"name\":\"Ada\",\"age\":(+ age 1),\"tags\":(list 'x 'y)})\n"
+                        "    (let user {\"name\":\"Ada\",\"age\":(+ age 1),\"tags\":(list \"x\" \"y\")})\n"
                         "    (transition end (get user age))))\n",
                 },
                 {

@@ -1,0 +1,6 @@
+(module tests json serialize)
+(state (start)
+  (steps
+    (let age 37)
+    (let user {"age":(+ age 1),"name":"Ada"})
+    (transition end (json user))))

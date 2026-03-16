@@ -91,7 +91,8 @@ maestro_value *maestro_value_list_get(const maestro_value *v, size_t idx);
 
 Object construction is intentionally narrow on the public side:
 `maestro_value_new_json()` parses a static JSON snippet into a runtime
-value. There is no public object mutation API.
+value. The input must be a valid JSON object text. There is no public
+object mutation API.
 
 ### Argument Ownership
 

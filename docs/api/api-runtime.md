@@ -253,7 +253,7 @@ maestro_value *maestro_value_new_json(maestro_ctx *ctx,
 ```
 
 Parses a static JSON snippet into a Maestro value. This is the public
-object-construction path.
+object-construction path. The input must be a valid JSON object text.
 
 ### `maestro_value_free`
 
