@@ -5,6 +5,62 @@
 >
 > – Abelson & Sussman, SICP, preface to the first edition
 
+Reference repository:
+[`https://git.peisongxiao.com/peisongxiao/maestro`](https://git.peisongxiao.com/peisongxiao/maestro)
+
+## Table of Contents
+
+- [Maestro Philosophy](#maestro-philosophy)
+- [File Name](#file-name)
+- [Comments](#comments)
+- [Definitions](#definitions)
+  - [Identifiers](#identifiers)
+  - [Reserved Literals and Keywords](#reserved-literals-and-keywords)
+  - [Scopes and Shadowing](#scopes-and-shadowing)
+- [Modules](#modules)
+  - [Exports](#exports)
+  - [Imports](#imports)
+- [Macros](#macros)
+  - [Reference Parameters](#reference-parameters)
+  - [Aliases](#aliases)
+- [States](#states)
+  - [Program Entry](#program-entry)
+- [Core Forms](#core-forms)
+  - [Steps](#steps)
+  - [Transition](#transition)
+  - [run](#run)
+- [Data Types](#data-types)
+  - [Integers](#integers)
+  - [Floats](#floats)
+  - [Strings](#strings)
+  - [Lists](#lists)
+  - [Data Objects](#data-objects)
+  - [Symbols](#symbols)
+  - [Booleans](#booleans)
+  - [References](#references)
+- [Runtime Type Predicates](#runtime-type-predicates)
+- [Built-in Value Predicates](#built-in-value-predicates)
+- [Truthiness](#truthiness)
+- [Equality and Comparison](#equality-and-comparison)
+- [Boolean Operators](#boolean-operators)
+- [Arithmetic](#arithmetic)
+  - [Numeric Conversion](#numeric-conversion)
+- [String and List Processing](#string-and-list-processing)
+  - [substr](#substr)
+  - [concat](#concat)
+  - [to-string](#to-string)
+- [Data Object Access](#data-object-access)
+- [let and set](#let-and-set)
+- [Case Expressions](#case-expressions)
+- [External Tools](#external-tools)
+- [Output](#output)
+- [JSON Helpers](#json-helpers)
+- [Usage Examples](#usage-examples)
+  - [Simple Arithmetic](#simple-arithmetic)
+  - [Lists and Strings](#lists-and-strings)
+  - [Data Objects and References](#data-objects-and-references)
+  - [Case and Booleans](#case-and-booleans)
+
 ## Maestro Philosophy
 
 Maestro was designed to be Lisp-like, the only allowed expression form
