@@ -135,8 +135,8 @@ The public AST node type tags are:
 - `MAESTRO_AST_FORM`
 - `MAESTRO_AST_JSON`
 
-These exist as part of the shared public type model even though the AST
-containers themselves are opaque.
+These exist as part of the shared public type model even though the
+AST containers themselves are opaque.
 
 ## Opaque Public Types
 

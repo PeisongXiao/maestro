@@ -26,14 +26,29 @@ Everything is built into `build/`.
 
 - [`build/maestroc`](build/maestroc): standalone compiler frontend
 - [`build/maestrovm`](build/maestrovm): thin runtime wrapper
-- [`build/maestroexts`](build/maestroexts): required-external inspection tool
+- [`build/maestroexts`](build/maestroexts): required-external
+  inspection tool
 
 ## Docs
 
-- [`docs/quickstart.md`](docs/quickstart.md)
-- [`docs/design/language-specs.md`](docs/design/language-specs.md)
-- [`docs/design/maestro-design.md`](docs/design/maestro-design.md)
-- [`docs/tools/maestro-tools.md`](docs/tools/maestro-tools.md)
+- [`docs/quickstart.md`](docs/quickstart.md): the shortest path from
+  source files to compiled artifacts, runtime execution, and test runs
+- [`docs/api/api-common.md`](docs/api/api-common.md): shared public
+  types, constants, flags, and callback typedefs from the common API
+  surface
+- [`docs/api/api-runtime.md`](docs/api/api-runtime.md): runtime
+  context lifecycle, loading, validation, program execution, value
+  creation, and value access APIs
+- [`docs/api/api-compile.md`](docs/api/api-compile.md): parser and
+  linker APIs for building `.mstro` artifacts from `.mstr` sources
+- [`docs/design/language-specs.md`](docs/design/language-specs.md):
+  the Maestro language definition, syntax, semantics, built-ins, and
+  examples
+- [`docs/design/maestro-design.md`](docs/design/maestro-design.md):
+  implementation-facing design for the packed artifact format, runtime
+  model, and library pipeline
+- [`docs/tools/maestro-tools.md`](docs/tools/maestro-tools.md):
+  high-level overview of the repository’s CLI tools and test runner
 
 ## Typical Flow
 
@@ -62,7 +77,8 @@ make test-mstr
 python3 tests/run_tests.py "tests modules caller"
 ```
 
-For embedded use, link against [`build/libmaestro.a`](build/libmaestro.a)
-and load `.mstro` artifacts through the runtime API instead of the CLI
-wrappers. Include [`include/maestro/maestro.h`](include/maestro/maestro.h)
-as the canonical public entry point.
+For embedded use, link against
+[`build/libmaestro.a`](build/libmaestro.a) and load `.mstro` artifacts
+through the runtime API instead of the CLI wrappers. Include
+[`include/maestro/maestro.h`](include/maestro/maestro.h) as the
+canonical public entry point.

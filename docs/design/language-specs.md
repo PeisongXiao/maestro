@@ -80,8 +80,8 @@ extension of your choice works.
 Maestro module bundles should have the extension `.mstro`. But any
 extension works as well.
 
-Maestro must be embedded into another program, it is not meant to stand
-on its own.
+Maestro must be embedded into another program, it is not meant to
+stand on its own.
 
 ## Comments
 
@@ -140,8 +140,8 @@ There are two kinds of scopes in Maestro:
 1. Global: the global scope contains all the global definitions.
 2. Per-macro scopes: the scope that each macro call creates.
 
-States are special macros, so state execution creates per-macro scope as
-well, with extra runtime metadata attached by the VM.
+States are special macros, so state execution creates per-macro scope
+as well, with extra runtime metadata attached by the VM.
 
 Global definitions in a module are not ordered. Missing global
 definitions are checked at parse time.
@@ -156,8 +156,8 @@ Shadowing is explicit via `let`.
 - replace an existing binding in the same scope
 - shadow a binding from a parent scope
 
-`set` does not create bindings. It only changes the value of an existing
-binding and obeys normal shadowing rules.
+`set` does not create bindings. It only changes the value of an
+existing binding and obeys normal shadowing rules.
 
 ## Modules
 
@@ -237,8 +237,8 @@ Subprograms are imported with:
 (define subprogram (import-program module-path))
 ```
 
-`import-program` may target a program even if its `start` state was not
-exported.
+`import-program` may target a program even if its `start` state was
+not exported.
 
 Inline imports are allowed within macro and state definitions.
 
@@ -279,9 +279,9 @@ Macros may be called.
 
 Macros may not be transitioned into.
 
-Macros may be passed as arguments. When passed as arguments, they resolve
-to references, effectively C pointers, to the referenced macro.
-Passed macro values satisfy both `macro?` and `ref?`.
+Macros may be passed as arguments. When passed as arguments, they
+resolve to references, effectively C pointers, to the referenced
+macro.  Passed macro values satisfy both `macro?` and `ref?`.
 
 Example:
 
@@ -302,8 +302,8 @@ Reference parameters are written like this:
 
 In this case `a` is a reference.
 
-Macro call arguments do not require explicit `ref`. Reference passing is
-inferred from the callee parameter declaration.
+Macro call arguments do not require explicit `ref`. Reference passing
+is inferred from the callee parameter declaration.
 
 Example:
 
@@ -346,12 +346,13 @@ States may be transitioned into.
 States are not callable as macros.
 
 States may be passed as arguments. When passed as arguments, they
-resolve to references, effectively C pointers, to the referenced state.
-Passed state values satisfy both `state?` and `ref?`.
+resolve to references, effectively C pointers, to the referenced
+state.  Passed state values satisfy both `state?` and `ref?`.
 
-State bodies do not return expression values to a caller because states
-are transitioned into, not returned from. The state return value is
-captured in the data object `last-state` under the field `val`.
+State bodies do not return expression values to a caller because
+states are transitioned into, not returned from. The state return
+value is captured in the data object `last-state` under the field
+`val`.
 
 States are defined like this:
 
@@ -374,8 +375,8 @@ Example:
 
 The starting state of a Maestro program is `start`.
 
-If a state named `start` exists, the module is executable. Otherwise the
-module acts as a library.
+If a state named `start` exists, the module is executable. Otherwise
+the module acts as a library.
 
 Transitioning to `end` terminates the program.
 
@@ -389,8 +390,8 @@ Program and subprogram return values may be any valid Maestro value.
   previous state
 - `(get last-state state)` returns a reference to the previous state
 
-When starting a new program, `last-state` is initialized by the runtime
-so that its `state` field is `start` and its `val` field is
+When starting a new program, `last-state` is initialized by the
+runtime so that its `state` field is `start` and its `val` field is
 unspecified. `val` is unspecified because it may hold a value of any
 type.
 
@@ -424,8 +425,8 @@ Example:
 
 `steps` is syntactic sugar over sequential execution.
 
-The return value of a `steps` expression is the return value of its last
-statement.
+The return value of a `steps` expression is the return value of its
+last statement.
 
 ### Transition
 
@@ -443,8 +444,8 @@ If a transition targets `end`, program execution terminates.
 Transitions to `end` must include a return value.
 
 If a `steps` block inside a state definition reaches the end without a
-transition, execution loops back to that same state with its persistent
-values intact.
+transition, execution loops back to that same state with its
+persistent values intact.
 
 If a transition targets a state in another module, program lifetime is
 handed to that other module. Control does not return to the original
@@ -477,8 +478,8 @@ Syntax:
 The target must be imported with `import-program`.
 
 The called program runs until it transitions to `end`. When it
-terminates, control returns to the caller and `run` returns the callee's
-return value.
+terminates, control returns to the caller and `run` returns the
+callee's return value.
 
 Running another state machine does not inherit the caller's current
 context. Values must be passed explicitly by value or by reference.
@@ -511,8 +512,8 @@ Maestro supports the following runtime data types:
 9. states
 10. macros
 
-Except for symbols, references, states, and macros, they should all map
-cleanly to JSON.
+Except for symbols, references, states, and macros, they should all
+map cleanly to JSON.
 
 ### Integers
 
@@ -557,8 +558,8 @@ Example:
 
 ### Lists
 
-Lists are explicitly constructed, they are not implicitly constructed by
-juxtaposition.
+Lists are explicitly constructed, they are not implicitly constructed
+by juxtaposition.
 
 Use:
 
@@ -707,7 +708,8 @@ Examples:
 Type-check timing:
 
 - parse-time: arity only
-- runtime: the predicate inspects the evaluated value and returns a boolean
+- runtime: the predicate inspects the evaluated value and returns a
+  boolean
 
 ## Built-in Value Predicates
 
@@ -729,8 +731,8 @@ Example:
 
 ## Truthiness
 
-Maestro uses explicit booleans, but values may be converted to booleans
-when required by predicates and boolean operators.
+Maestro uses explicit booleans, but values may be converted to
+booleans when required by predicates and boolean operators.
 
 The rules are:
 
@@ -746,8 +748,8 @@ The rules are:
 
 `empty?` returns true for all `empty-*` values.
 
-An empty string does not equal an empty list, and an empty list does not
-equal an empty data object.
+An empty string does not equal an empty list, and an empty list does
+not equal an empty data object.
 
 ## Equality and Comparison
 
@@ -841,8 +843,8 @@ Arithmetic is strongly typed for numbers.
 Arithmetic operators accept any number of arguments, but at least two.
 They are evaluated in the given order.
 
-Strings, lists, data objects, symbols, booleans, and references are not
-valid arithmetic operands and should result in a runtime `ERROR`.
+Strings, lists, data objects, symbols, booleans, and references are
+not valid arithmetic operands and should result in a runtime `ERROR`.
 
 Valid division always produces a float internally.
 
@@ -872,8 +874,8 @@ The explicit numeric conversion helpers are:
 - `ceil`
 - `floor`
 
-`ceil` and `floor` convert floats to integers. Applied to integers, they
-return the integer value unchanged.
+`ceil` and `floor` convert floats to integers. Applied to integers,
+they return the integer value unchanged.
 
 Type-check timing:
 
@@ -998,8 +1000,8 @@ If a path is missing in `get` or `ref`, the runtime must raise an
 Type-check timing:
 
 - parse-time: form shape only
-- runtime: object path resolution, missing-path detection, intermediate
-  object creation for `set`, and reference creation
+- runtime: object path resolution, missing-path detection,
+  intermediate object creation for `set`, and reference creation
 
 Examples:
 
@@ -1044,8 +1046,8 @@ Examples:
 
 `set` may rebind the type of the value it assigns.
 
-If the binding is a reference, `set` writes through the reference like a
-C++ reference.
+If the binding is a reference, `set` writes through the reference like
+a C++ reference.
 
 Example:
 
@@ -1061,7 +1063,8 @@ If `set` cannot resolve its target binding, it is an error.
 Type-check timing:
 
 - parse-time: binding form shape only
-- runtime: binding resolution, reference assignment, and path resolution
+- runtime: binding resolution, reference assignment, and path
+  resolution
 
 ## Case Expressions
 
@@ -1095,7 +1098,8 @@ Example:
 
 ## External Tools
 
-Tools represent external capabilities and are declared with `external`.
+Tools represent external capabilities and are declared with
+`external`.
 
 Example:
 
@@ -1154,16 +1158,16 @@ Maestro provides the following JSON helpers:
 
 These are meant to help interop with the outside world.
 
-`json-parse` parses a JSON object provided as a string and returns a data
-object.
+`json-parse` parses a JSON object provided as a string and returns a
+data object.
 
-`json` accepts an inline JSON object snippet and returns a data object.
-JSON snippets may contain Maestro code in value position.
+`json` accepts an inline JSON object snippet and returns a data
+object.  JSON snippets may contain Maestro code in value position.
 JSON snippet values are checked at runtime and may only evaluate to
 numbers, strings, lists containing valid JSON snippet values, or data
-objects containing valid JSON snippet values.
-JSON snippets may not contain symbols, except that a list of symbols may
-be evaluated as a list of strings.
+objects containing valid JSON snippet values.  JSON snippets may not
+contain symbols, except that a list of symbols may be evaluated as a
+list of strings.
 
 `json-list` accepts a Maestro list and returns a JSON array value.
 

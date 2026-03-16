@@ -21,8 +21,8 @@ It does not run Maestro programs.
 
 ## `maestrovm`
 
-[`build/maestrovm`](../../build/maestrovm) is a thin CLI wrapper around
-the runtime library.
+[`build/maestrovm`](../../build/maestrovm) is a thin CLI wrapper
+around the runtime library.
 
 It is responsible for:
 
@@ -38,8 +38,8 @@ It is useful for smoke tests and manual runtime checks.
 
 [`build/maestroexts`](../../build/maestroexts) is an inspection tool.
 
-It reads a `.mstro` artifact and prints the required external tool names
-recorded in the artifact header sections.
+It reads a `.mstro` artifact and prints the required external tool
+names recorded in the artifact header sections.
 
 It does not execute program code.
 
@@ -52,7 +52,8 @@ It is responsible for:
 
 - compiling categorized `.mstr` test bundles with
   [`build/maestroc`](../../build/maestroc)
-- running selected modules through [`build/hostrun`](../../build/hostrun)
+- running selected modules through
+  [`build/hostrun`](../../build/hostrun)
 - capturing `print` and `log`
 - validating required externals when needed
 - filtering the run to specific module paths when positional arguments

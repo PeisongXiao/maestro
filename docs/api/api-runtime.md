@@ -25,7 +25,8 @@ The public runtime API is intentionally opaque:
 - `maestro_ctx` is an opaque runtime context
 - `maestro_value` is an opaque runtime value
 
-Callers create and destroy these objects only through public functions.
+Callers create and destroy these objects only through public
+functions.
 
 ## Common Types
 
@@ -49,8 +50,8 @@ also summarized in [`api-common.md`](api-common.md).
 maestro_ctx *maestro_ctx_new(void);
 ```
 
-Creates a new runtime context with default output functions and default
-allocation hooks.
+Creates a new runtime context with default output functions and
+default allocation hooks.
 
 ### `maestro_ctx_free`
 
@@ -86,8 +87,8 @@ int maestro_ctx_set_allocator(maestro_ctx *ctx, maestro_alloc_fn alloc,
                               maestro_free_fn dealloc);
 ```
 
-Overrides the allocator pair used for runtime-owned allocations created
-after the change.
+Overrides the allocator pair used for runtime-owned allocations
+created after the change.
 
 ### `maestro_ctx_set_capability`
 
@@ -121,8 +122,8 @@ Registers one external tool binding by name.
 int maestro_load(maestro_ctx *ctx, const void *src);
 ```
 
-Loads a packed `.mstro` image into the runtime context. The runtime uses
-the image zero-copy.
+Loads a packed `.mstro` image into the runtime context. The runtime
+uses the image zero-copy.
 
 ### `maestro_ctx_set_image_len`
 
@@ -174,7 +175,8 @@ Result rules:
 
 - `result` receives a runtime-allocated `maestro_value *`
 - the caller owns that returned handle
-- the caller must release it with `maestro_value_free(ctx, result_value)`
+- the caller must release it with `maestro_value_free(ctx,
+  result_value)`
 
 ## Value Construction
 
@@ -264,8 +266,8 @@ int maestro_list_push(maestro_ctx *ctx, maestro_value *list, maestro_value *v);
 
 Appends one value to a Maestro list.
 
-The pushed value is conceptually copied into the list; callers still own
-their original handle.
+The pushed value is conceptually copied into the list; callers still
+own their original handle.
 
 ## Value Accessors
 
@@ -331,13 +333,14 @@ Returns the list length, or `0` for non-list values.
 maestro_value *maestro_value_list_get(const maestro_value *v, size_t idx);
 ```
 
-Returns a borrowed handle to the list element at `idx`, or `NULL` if the
-value is not a list or the index is out of range.
+Returns a borrowed handle to the list element at `idx`, or `NULL` if
+the value is not a list or the index is out of range.
 
 ## Notes
 
-- Include [`include/maestro/maestro.h`](../../include/maestro/maestro.h)
-  if you want the whole public API.
+- Include
+  [`include/maestro/maestro.h`](../../include/maestro/maestro.h) if
+  you want the whole public API.
 - Include only
   [`include/maestro/runtime.h`](../../include/maestro/runtime.h) and
   [`include/maestro/runtime-helpers.h`](../../include/maestro/runtime-helpers.h)

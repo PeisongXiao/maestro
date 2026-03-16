@@ -1,7 +1,7 @@
 # Maestro Library Design
 
-This document describes the implementation-facing design of the Maestro
-library and toolchain. Surface language semantics live in
+This document describes the implementation-facing design of the
+Maestro library and toolchain. Surface language semantics live in
 [`docs/design/language-specs.md`](language-specs.md).
 
 ## Public Surface
@@ -53,14 +53,15 @@ int maestro_run(maestro_ctx *ctx, const char *module_path,
 size_t maestro_list_externals(maestro_ctx *ctx, const char ***names);
 ```
 
-Parser diagnostics are written directly to `FILE *err`. Directory walking
-is not part of the parser library; [`build/maestroc`](../../build/maestroc)
-owns source discovery.
+Parser diagnostics are written directly to `FILE *err`. Directory
+walking is not part of the parser library;
+[`build/maestroc`](../../build/maestroc) owns source discovery.
 
 ## Runtime Values
 
-`maestro_value` is opaque and context-associated. The public helper layer
-exposes construction, destruction, and a narrow set of accessors:
+`maestro_value` is opaque and context-associated. The public helper
+layer exposes construction, destruction, and a narrow set of
+accessors:
 
 ```c
 maestro_value *maestro_value_new_invalid(maestro_ctx *ctx);
@@ -91,13 +92,13 @@ value. There is no public object mutation API.
 
 ### Argument Ownership
 
-`maestro_run()` borrows its input argument handles for the duration of the
-call:
+`maestro_run()` borrows its input argument handles for the duration of
+the call:
 
 - callers keep `args[i]` alive and unchanged until `maestro_run()`
   returns
-- the runtime clones values that need to escape into longer-lived runtime
-  state
+- the runtime clones values that need to escape into longer-lived
+  runtime state
 
 The returned `result` handle is runtime-allocated and becomes the
 caller’s responsibility. The caller must later destroy it with
@@ -134,8 +135,8 @@ The runtime is optimized around:
 - identifier-ID-backed lookup in hot paths
 - early external discovery for validation and inspection
 
-The current executor still runs a packed AST-like node graph rather than
-lowered bytecode.
+The current executor still runs a packed AST-like node graph rather
+than lowered bytecode.
 
 ## Header and Validation
 
@@ -217,12 +218,13 @@ Outputs are written under [`build/`](../../build/), including:
 The current implementation is intentionally minimal but end-to-end:
 
 - parse and link happen ahead of runtime
-- [`build/maestroc`](../../build/maestroc) is the standalone compiler driver
+- [`build/maestroc`](../../build/maestroc) is the standalone compiler
+  driver
 - runtime loads packed linked bundles zero-copy
 - runtime values are opaque handles
-- inspection and diagnostics stay available through names and strings in
-  the image
+- inspection and diagnostics stay available through names and strings
+  in the image
 
-The next major optimization step, if needed later, would be lowering the
-packed AST image into a denser execution format. That is not part of the
-current implementation.
+The next major optimization step, if needed later, would be lowering
+the packed AST image into a denser execution format. That is not part
+of the current implementation.

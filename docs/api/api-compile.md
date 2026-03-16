@@ -26,8 +26,8 @@ The public compile API is intentionally small.
 - directory discovery is a tool responsibility, not a library
   responsibility
 
-`build/maestroc` is the standalone compiler frontend that performs file
-collection and then calls into this API.
+`build/maestroc` is the standalone compiler frontend that performs
+file collection and then calls into this API.
 
 ## AST Collection Lifecycle
 
@@ -85,8 +85,8 @@ Rules:
 int maestro_link(FILE *dest, maestro_asts *src);
 ```
 
-Links the parsed modules into one packed `.mstro` artifact using default
-artifact header settings.
+Links the parsed modules into one packed `.mstro` artifact using
+default artifact header settings.
 
 ### `maestro_link_ex`
 
@@ -102,7 +102,8 @@ Arguments:
 
 - `magic`: optional 32-byte artifact magic; pass `NULL` to use the
   default
-- `capability`: required-capabilities bitmap to write into the artifact
+- `capability`: required-capabilities bitmap to write into the
+  artifact
 
 ## Related Constants
 

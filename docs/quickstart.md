@@ -62,8 +62,8 @@ build/maestrovm build/examples/modules.mstro app.caller
 ```
 
 Note that [`build/maestrovm`](../build/maestrovm) is a thin runtime
-wrapper. Real embedded use should load the artifact through the library
-and bind required tools in `maestro_ctx`.
+wrapper. Real embedded use should load the artifact through the
+library and bind required tools in `maestro_ctx`.
 
 ## Run Source Suites
 
@@ -84,6 +84,9 @@ python3 tests/run_tests.py "tests modules caller" "tests json parse"
 
 ## More Reading
 
+- [`docs/api/api-common.md`](api/api-common.md)
+- [`docs/api/api-runtime.md`](api/api-runtime.md)
+- [`docs/api/api-compile.md`](api/api-compile.md)
 - [`docs/design/language-specs.md`](design/language-specs.md)
 - [`docs/design/maestro-design.md`](design/maestro-design.md)
 - [`docs/tools/maestro-tools.md`](tools/maestro-tools.md)
