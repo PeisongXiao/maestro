@@ -45,6 +45,7 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic, uint64_
 
 maestro_ctx *maestro_ctx_new(void);
 void maestro_ctx_free(maestro_ctx *ctx);
+int maestro_register_fn(maestro_ctx *ctx, const char *name, maestro_fn fn);
 int maestro_load(maestro_ctx *ctx, const void *src);
 void maestro_ctx_set_image_len(maestro_ctx *ctx, size_t len);
 uint64_t maestro_validate(maestro_ctx *ctx, FILE *err);
@@ -107,6 +108,11 @@ the call:
 The returned `result` handle is runtime-allocated and becomes the
 caller’s responsibility. The caller must later destroy it with
 `maestro_value_free(ctx, result)`.
+
+External function bindings are registered explicitly with
+`maestro_register_fn()`. The callback receives borrowed input
+arguments and returns a runtime-owned `maestro_value *` through its
+result pointer.
 
 ## Artifact Model
 
@@ -190,7 +196,7 @@ bitmap. `maestro_validate()` checks that the VM capability bitmap in
 
 ## Externals
 
-Required externals are recorded in a dedicated section before the node
+Required external function bindings are recorded in a dedicated section before the node
 table. That allows fast inspection and validation without walking the
 code graph.
 

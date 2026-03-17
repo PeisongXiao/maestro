@@ -18,7 +18,7 @@ TESTS = $(BUILD_DIR)/smoke $(BUILD_DIR)/hostrun
 EXAMPLE_CATS := basics external json modules refs state
 EXAMPLE_ARTIFACTS := $(patsubst %,$(BUILD_DIR)/examples/%.mstro,$(EXAMPLE_CATS))
 
-.PHONY: all clean test runtime tools examples test-mstr
+.PHONY: all clean test runtime tools examples test-mstr test-deep
 
 all: runtime tools $(TESTS)
 
@@ -101,6 +101,9 @@ test: all
 
 test-mstr: tools $(BUILD_DIR)/hostrun
 	python3 tests/run_tests.py
+
+test-deep: tools $(BUILD_DIR)/hostrun
+	python3 tests/run_tests.py --deep
 
 clean:
 	rm -rf $(BUILD_DIR)

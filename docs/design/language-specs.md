@@ -52,7 +52,7 @@ Reference repository:
 - [Data Object Access](#data-object-access)
 - [let and set](#let-and-set)
 - [Case Expressions](#case-expressions)
-- [External Tools](#external-tools)
+- [External Function Bindings](#external-function-bindings)
 - [Output](#output)
 - [JSON Helpers](#json-helpers)
 - [Usage Examples](#usage-examples)
@@ -1117,10 +1117,10 @@ Example:
   (default (transition error)))
 ```
 
-## External Tools
+## External Function Bindings
 
-Tools represent external capabilities and are declared with
-`external`.
+External function bindings represent host-provided capabilities and are
+declared with `external`.
 
 Example:
 
@@ -1128,7 +1128,8 @@ Example:
 (define (search query) external)
 ```
 
-The runtime expects the host environment to provide implementations.
+The runtime expects the host environment to provide implementations for
+these functions.
 
 ## Output
 
@@ -1147,7 +1148,7 @@ By default:
 They are bound separately and both use this C function shape:
 
 ```c
-int (*maestro_output)(maestro_ctx *ctx, char *)
+int (*maestro_output)(maestro_ctx *ctx, const char *)
 ```
 
 Both `log` and `print` return the raw integer from the bound C

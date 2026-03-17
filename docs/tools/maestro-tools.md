@@ -39,7 +39,7 @@ It is useful for smoke tests and manual runtime checks.
 
 [`build/maestroexts`](../../build/maestroexts) is an inspection tool.
 
-It reads a `.mstro` artifact and prints the required external tool
+It reads a `.mstro` artifact and prints the required external function
 names recorded in the artifact header sections.
 
 It does not execute program code.

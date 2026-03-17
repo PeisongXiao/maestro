@@ -48,11 +48,181 @@ static int capture_stderr(struct maestro_ctx *ctx, const char *msg) {
         return buf_append(&g_stderr_buf, msg) ? -1 : (int)strlen(msg);
 }
 
-static int ext_len(struct maestro_ctx *ctx, const char *msg) {
-        (void)ctx;
-        return (int)strlen(msg);
+static int value_list_push_take(maestro_ctx *ctx, maestro_value *list,
+                                maestro_value *item) {
+        int rc;
+
+        if (!item)
+                return MAESTRO_ERR_NOMEM;
+
+        rc = maestro_list_push(ctx, list, item);
+        maestro_value_free(ctx, item);
+        return rc;
 }
 
+static int fn_echo(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                   maestro_value **result) {
+        const char *msg;
+
+        if (!ctx || !args || !result || argc != 1)
+                return MAESTRO_ERR_RUNTIME;
+
+        msg = maestro_value_as_string(args[0]);
+
+        if (!msg)
+                return MAESTRO_ERR_RUNTIME;
+
+        *result = maestro_value_new_int(ctx, (maestro_int_t)strlen(msg));
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
+
+static int fn_host_int(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                       maestro_value **result) {
+        (void)args;
+        if (!ctx || !result || argc != 0)
+                return MAESTRO_ERR_RUNTIME;
+        *result = maestro_value_new_int(ctx, 7);
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
+
+static int fn_host_float(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                         maestro_value **result) {
+        (void)args;
+        if (!ctx || !result || argc != 0)
+                return MAESTRO_ERR_RUNTIME;
+        *result = maestro_value_new_float(ctx, 2.5f);
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
+
+static int fn_host_bool(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                        maestro_value **result) {
+        (void)args;
+        if (!ctx || !result || argc != 0)
+                return MAESTRO_ERR_RUNTIME;
+        *result = maestro_value_new_bool(ctx, true);
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
+
+static int fn_host_string(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                          maestro_value **result) {
+        (void)args;
+        if (!ctx || !result || argc != 0)
+                return MAESTRO_ERR_RUNTIME;
+        *result = maestro_value_new_string(ctx, "host");
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
+
+static int fn_host_symbol(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                          maestro_value **result) {
+        (void)args;
+        if (!ctx || !result || argc != 0)
+                return MAESTRO_ERR_RUNTIME;
+        *result = maestro_value_new_symbol(ctx, "token");
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
+
+static int fn_host_list(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                        maestro_value **result) {
+        maestro_value *list;
+        maestro_value *nested;
+
+        (void)args;
+        if (!ctx || !result || argc != 0)
+                return MAESTRO_ERR_RUNTIME;
+
+        list = maestro_value_new_list(ctx);
+        nested = maestro_value_new_list(ctx);
+
+        if (!list || !nested) {
+            if (list)
+                    maestro_value_free(ctx, list);
+            if (nested)
+                    maestro_value_free(ctx, nested);
+            return MAESTRO_ERR_NOMEM;
+        }
+
+        if (value_list_push_take(ctx, nested, maestro_value_new_int(ctx, 1)) ||
+            value_list_push_take(ctx, nested, maestro_value_new_string(ctx, "nest")) ||
+            value_list_push_take(ctx, list, maestro_value_new_int(ctx, 7)) ||
+            value_list_push_take(ctx, list, maestro_value_new_float(ctx, 2.5f)) ||
+            value_list_push_take(ctx, list, maestro_value_new_bool(ctx, true)) ||
+            value_list_push_take(ctx, list, maestro_value_new_string(ctx, "Ada")) ||
+            value_list_push_take(ctx, list, maestro_value_new_symbol(ctx, "token")) ||
+            maestro_list_push(ctx, list, nested)) {
+                maestro_value_free(ctx, nested);
+                maestro_value_free(ctx, list);
+                return MAESTRO_ERR_NOMEM;
+        }
+
+        maestro_value_free(ctx, nested);
+        *result = list;
+        return 0;
+}
+
+static int fn_host_object(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                          maestro_value **result) {
+        (void)args;
+        if (!ctx || !result || argc != 0)
+                return MAESTRO_ERR_RUNTIME;
+        *result = maestro_value_new_json(
+                ctx,
+                "{\"user\":{\"name\":\"Ada\",\"meta\":{\"active\":\"yes\"}},\"scores\":[1,2,3]}");
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
+
+static int fn_host_check(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                         maestro_value **result) {
+        maestro_int_t i;
+        maestro_float_t f;
+        bool b;
+        const char *s;
+        const char *sym;
+        maestro_value *nested;
+
+        if (!ctx || !args || !result || argc != 6)
+                return MAESTRO_ERR_RUNTIME;
+
+        if (maestro_value_as_int(args[0], &i) || i != 7)
+                return MAESTRO_ERR_RUNTIME;
+        if (maestro_value_as_float(args[1], &f) || f != 2.5f)
+                return MAESTRO_ERR_RUNTIME;
+        if (maestro_value_as_bool(args[2], &b) || !b)
+                return MAESTRO_ERR_RUNTIME;
+
+        s = maestro_value_as_string(args[3]);
+        sym = maestro_value_as_symbol(args[4]);
+        if (!s || strcmp(s, "host") || !sym || strcmp(sym, "token"))
+                return MAESTRO_ERR_RUNTIME;
+
+        if (maestro_value_list_len(args[5]) != 6)
+                return MAESTRO_ERR_RUNTIME;
+
+        if (!maestro_value_list_get(args[5], 0) ||
+            maestro_value_as_int(maestro_value_list_get(args[5], 0), &i) || i != 7)
+                return MAESTRO_ERR_RUNTIME;
+        if (!maestro_value_list_get(args[5], 1) ||
+            maestro_value_as_float(maestro_value_list_get(args[5], 1), &f) || f != 2.5f)
+                return MAESTRO_ERR_RUNTIME;
+        if (!maestro_value_list_get(args[5], 2) ||
+            maestro_value_as_bool(maestro_value_list_get(args[5], 2), &b) || !b)
+                return MAESTRO_ERR_RUNTIME;
+        s = maestro_value_as_string(maestro_value_list_get(args[5], 3));
+        sym = maestro_value_as_symbol(maestro_value_list_get(args[5], 4));
+        if (!s || strcmp(s, "Ada") || !sym || strcmp(sym, "token"))
+                return MAESTRO_ERR_RUNTIME;
+
+        nested = maestro_value_list_get(args[5], 5);
+        if (!nested || maestro_value_list_len(nested) != 2)
+                return MAESTRO_ERR_RUNTIME;
+        if (maestro_value_as_int(maestro_value_list_get(nested, 0), &i) || i != 1)
+                return MAESTRO_ERR_RUNTIME;
+        s = maestro_value_as_string(maestro_value_list_get(nested, 1));
+        if (!s || strcmp(s, "nest"))
+                return MAESTRO_ERR_RUNTIME;
+
+        *result = maestro_value_new_string(ctx, "checked");
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
 static void *slurp(const char *path, size_t *len) {
         FILE *fp;
         long end;
@@ -259,7 +429,18 @@ int main(int argc, char **argv) {
 
         maestro_ctx_set_output(ctx, capture_stdout, capture_stderr);
         maestro_ctx_set_vm_logger(ctx, capture_stderr);
-        maestro_ctx_add_tool(ctx, "echo", ext_len);
+        if (maestro_register_fn(ctx, "echo", fn_echo) ||
+            maestro_register_fn(ctx, "host-int", fn_host_int) ||
+            maestro_register_fn(ctx, "host-float", fn_host_float) ||
+            maestro_register_fn(ctx, "host-bool", fn_host_bool) ||
+            maestro_register_fn(ctx, "host-string", fn_host_string) ||
+            maestro_register_fn(ctx, "host-symbol", fn_host_symbol) ||
+            maestro_register_fn(ctx, "host-list", fn_host_list) ||
+            maestro_register_fn(ctx, "host-object", fn_host_object) ||
+            maestro_register_fn(ctx, "host-check", fn_host_check)) {
+                fprintf(stderr, "register functions failed\n");
+                goto out;
+        }
 
         if (argc > 3) {
                 args = calloc((size_t)(argc - 3), sizeof(*args));
@@ -290,6 +471,10 @@ int main(int argc, char **argv) {
         if (maestro_run(ctx, argv[2], args, argc > 3 ? (size_t)(argc - 3) : 0,
                         &result)) {
                 fprintf(stderr, "run failed\n");
+                fprintf(stderr, "[stdout]\n%s\n[/stdout]\n",
+                        g_stdout_buf.buf ? g_stdout_buf.buf : "");
+                fprintf(stderr, "[stderr]\n%s\n[/stderr]\n",
+                        g_stderr_buf.buf ? g_stderr_buf.buf : "");
                 goto out;
         }
 

@@ -46,7 +46,7 @@ Useful options:
 
 ## Inspect Required Externals
 
-Before embedding a bundle, inspect its required tool bindings:
+Before embedding a bundle, inspect its required external function bindings:
 
 ```sh
 build/maestroexts build/examples/external.mstro
@@ -63,7 +63,8 @@ build/maestrovm build/examples/modules.mstro "app caller"
 
 Note that [`build/maestrovm`](../build/maestrovm) is a thin runtime
 wrapper. Real embedded use should load the artifact through the
-library and bind required tools in `maestro_ctx`.
+library and register required external function bindings in
+`maestro_ctx`.
 
 ## Run Source Suites
 

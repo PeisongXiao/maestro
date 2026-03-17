@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
         maestro_ctx_set_image_len(ctx, len);
 
-        if (maestro_validate(ctx, NULL) & ~MAESTRO_VERR_TOOL) {
+        if (maestro_validate(ctx, NULL) & ~MAESTRO_VERR_FN) {
                 maestro_ctx_free(ctx);
                 free(buf);
                 return 1;

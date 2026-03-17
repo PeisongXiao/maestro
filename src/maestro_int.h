@@ -92,9 +92,9 @@ struct maestro_value {
         } v;
 };
 
-struct maestro_tool_binding {
+struct maestro_fn_binding {
         char *name;
-        maestro_output fn;
+        maestro_fn fn;
 };
 
 struct maestro_ctx {
@@ -121,9 +121,9 @@ struct maestro_ctx {
         maestro_output vm_logger;
         maestro_alloc_fn alloc;
         maestro_free_fn dealloc;
-        struct maestro_tool_binding *tools;
-        size_t tool_nr;
-        size_t tool_cap;
+        struct maestro_fn_binding *fns;
+        size_t fn_nr;
+        size_t fn_cap;
         const char **ext_names_cache;
         void *priv;
 };

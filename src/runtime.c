@@ -2133,6 +2133,8 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 maestro_value run_arg = argc >= 2 ?
                                         eval_node(rctx, mod, scope, node->first + 2, eres) :
                                         v_list(rctx->ctx);
+                maestro_value *run_argv = NULL;
+                size_t run_argc;
 
                 if (prog.type != MAESTRO_VAL_PROGRAM)
                         return v_invalid();
@@ -2147,9 +2149,38 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 if (!start)
                         return v_invalid();
 
-                return run_program(rctx, run_mod,
-                                   run_arg.type == MAESTRO_VAL_LIST ? run_arg.v.list->item : &run_arg,
-                                   run_arg.type == MAESTRO_VAL_LIST ? run_arg.v.list->nr : 1);
+                run_argc = run_arg.type == MAESTRO_VAL_LIST ? run_arg.v.list->nr : 1;
+                if (run_arg.type == MAESTRO_VAL_LIST && !run_argc)
+                        return run_program(rctx, run_mod, NULL, 0);
+
+                run_argv = rctx->ctx->alloc(run_argc * sizeof(*run_argv));
+
+                if (!run_argv)
+                        return v_invalid();
+
+                for (i = 0; i < run_argc; i++) {
+                        maestro_value src = run_arg.type == MAESTRO_VAL_LIST ?
+                                            run_arg.v.list->item[i] : run_arg;
+
+                        run_argv[i] = clone_value(rctx->ctx, src);
+                        if (run_argv[i].type == MAESTRO_VAL_INVALID &&
+                            src.type != MAESTRO_VAL_INVALID) {
+                                while (i > 0) {
+                                        i--;
+                                        maestro_value_reset(rctx->ctx, &run_argv[i]);
+                                }
+                                rctx->ctx->dealloc(run_argv);
+                                return v_invalid();
+                        }
+                }
+
+                out = run_program(rctx, run_mod, run_argv, run_argc);
+                while (run_argc > 0) {
+                        run_argc--;
+                        maestro_value_reset(rctx->ctx, &run_argv[run_argc]);
+                }
+                rctx->ctx->dealloc(run_argv);
+                return out;
         }
 
         if (!strcmp(op, "import") && node->nr >= 3) {
@@ -2561,21 +2592,35 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                         if (body->type == IMG_NODE_IDENT &&
                             !strcmp(node_ident_name(rctx->ctx, body), "external")) {
                                 size_t t;
-                                const char *tool_name = img_ident_name(rctx->ctx, h->name_id);
+                                const char *fn_name = img_ident_name(rctx->ctx, h->name_id);
+                                maestro_value **argp = NULL;
+                                maestro_value *ext_result = NULL;
+                                int rc = MAESTRO_ERR_RUNTIME;
 
-                                for (t = 0; t < rctx->ctx->tool_nr; t++) {
-                                        if (!strcmp(rctx->ctx->tools[t].name, tool_name) && argc >= 1) {
-                                                char *s = maestro_value_stringify(rctx->ctx, argv[0]);
+                                if (argc) {
+                                        argp = rctx->ctx->alloc(argc * sizeof(*argp));
 
-                                                if (!s)
+                                        if (!argp)
                                                         goto out;
+                                }
 
-                                                out = v_int(rctx->ctx->tools[t].fn(rctx->ctx, s));
-                                                free(s);
+                                for (t = 0; t < argc; t++)
+                                        argp[t] = &argv[t];
+
+                                for (t = 0; t < rctx->ctx->fn_nr; t++) {
+                                        if (!strcmp(rctx->ctx->fns[t].name, fn_name)) {
+                                                rc = rctx->ctx->fns[t].fn(rctx->ctx, argp, argc,
+                                                                          &ext_result);
+                                                if (!rc && ext_result)
+                                                        out = clone_value(rctx->ctx, *ext_result);
+                                                if (ext_result)
+                                                        maestro_value_free(rctx->ctx, ext_result);
+                                                rctx->ctx->dealloc(argp);
                                                 goto out;
                                         }
                                 }
 
+                                rctx->ctx->dealloc(argp);
                                 goto out;
                         }
 

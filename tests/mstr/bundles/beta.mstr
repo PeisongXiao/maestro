@@ -1,0 +1,5 @@
+(module tests bundles beta)
+(define (echo msg) external)
+(state (start)
+  (steps
+    (transition end (to-string (echo "bundle")))))

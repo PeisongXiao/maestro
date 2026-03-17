@@ -106,13 +106,16 @@ void maestro_ctx_set_log_flags(maestro_ctx *ctx, uint64_t flags);
 
 Sets VM logging verbosity flags.
 
-### `maestro_ctx_add_tool`
+### `maestro_register_fn`
 
 ```c
-int maestro_ctx_add_tool(maestro_ctx *ctx, const char *name, maestro_output fn);
+int maestro_register_fn(maestro_ctx *ctx, const char *name, maestro_fn fn);
 ```
 
-Registers one external tool binding by name.
+Registers one external function binding by name.
+
+The registered callback receives borrowed input argument handles and
+returns a runtime-owned result handle through `result`.
 
 ## Loading and Validation
 
@@ -148,7 +151,7 @@ reported as bit flags and may also be written to `err`.
 size_t maestro_list_externals(maestro_ctx *ctx, const char ***names);
 ```
 
-Returns the required external tool names recorded in the artifact.
+Returns the required external function names recorded in the artifact.
 
 ## Program Execution
 

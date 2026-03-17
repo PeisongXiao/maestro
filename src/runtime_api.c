@@ -30,10 +30,10 @@ void maestro_ctx_free(maestro_ctx *ctx) {
         if (!ctx)
                 return;
 
-        for (i = 0; i < ctx->tool_nr; i++)
-                ctx->dealloc(ctx->tools[i].name);
+        for (i = 0; i < ctx->fn_nr; i++)
+                ctx->dealloc(ctx->fns[i].name);
 
-        ctx->dealloc(ctx->tools);
+        ctx->dealloc(ctx->fns);
         ctx->dealloc((void *)ctx->ext_names_cache);
         free(ctx);
 }
@@ -76,29 +76,35 @@ void maestro_ctx_set_log_flags(maestro_ctx *ctx, uint64_t flags) {
                 ctx->log_flags = flags;
 }
 
-int maestro_ctx_add_tool(maestro_ctx *ctx, const char *name,
-                         maestro_output fn) {
-        struct maestro_tool_binding *nv;
+int maestro_register_fn(maestro_ctx *ctx, const char *name,
+                        maestro_fn fn) {
+        struct maestro_fn_binding *nv;
         char *dup;
+        size_t i;
 
         if (!ctx || !name || !fn)
                 return MAESTRO_ERR_RUNTIME;
 
-        if (ctx->tool_nr == ctx->tool_cap) {
-                size_t ncap = ctx->tool_cap ? ctx->tool_cap * 2 : 8;
+        for (i = 0; i < ctx->fn_nr; i++) {
+                if (!strcmp(ctx->fns[i].name, name))
+                        return MAESTRO_ERR_RUNTIME;
+        }
+
+        if (ctx->fn_nr == ctx->fn_cap) {
+                size_t ncap = ctx->fn_cap ? ctx->fn_cap * 2 : 8;
 
                 nv = ctx->alloc(ncap * sizeof(*nv));
 
                 if (!nv)
                         return MAESTRO_ERR_NOMEM;
 
-                if (ctx->tools) {
-                        memcpy(nv, ctx->tools, ctx->tool_nr * sizeof(*nv));
-                        ctx->dealloc(ctx->tools);
+                if (ctx->fns) {
+                        memcpy(nv, ctx->fns, ctx->fn_nr * sizeof(*nv));
+                        ctx->dealloc(ctx->fns);
                 }
 
-                ctx->tools = nv;
-                ctx->tool_cap = ncap;
+                ctx->fns = nv;
+                ctx->fn_cap = ncap;
         }
 
         dup = ctx->alloc(strlen(name) + 1);
@@ -107,9 +113,9 @@ int maestro_ctx_add_tool(maestro_ctx *ctx, const char *name,
                 return MAESTRO_ERR_NOMEM;
 
         strcpy(dup, name);
-        ctx->tools[ctx->tool_nr].name = dup;
-        ctx->tools[ctx->tool_nr].fn = fn;
-        ctx->tool_nr++;
+        ctx->fns[ctx->fn_nr].name = dup;
+        ctx->fns[ctx->fn_nr].fn = fn;
+        ctx->fn_nr++;
         return 0;
 }
 
@@ -200,15 +206,15 @@ uint64_t maestro_validate(maestro_ctx *dest, FILE *err) {
                 size_t t;
                 bool found = false;
 
-                for (t = 0; t < dest->tool_nr; t++) {
-                        if (!strcmp(dest->tools[t].name, dest->img_strs + exts[i].name_off)) {
+                for (t = 0; t < dest->fn_nr; t++) {
+                        if (!strcmp(dest->fns[t].name, dest->img_strs + exts[i].name_off)) {
                                 found = true;
                                 break;
                         }
                 }
 
                 if (!found) {
-                        flags |= MAESTRO_VERR_TOOL;
+                        flags |= MAESTRO_VERR_FN;
                         break;
                 }
         }

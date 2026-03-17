@@ -1,0 +1,3 @@
+(module tests bundles lib)
+(export *)
+(define (decorate prefix msg) (concat prefix ":" msg))

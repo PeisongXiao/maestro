@@ -15,9 +15,20 @@ struct run_case {
         const char *expect;
 };
 
-static int ext_len(struct maestro_ctx *ctx, const char *msg) {
-        (void)ctx;
-        return (int)strlen(msg);
+static int ext_len(struct maestro_ctx *ctx, maestro_value **args, size_t argc,
+                   maestro_value **result) {
+        const char *msg;
+
+        if (!ctx || !args || !result || argc != 1)
+                return MAESTRO_ERR_RUNTIME;
+
+        msg = maestro_value_as_string(args[0]);
+
+        if (!msg)
+                return MAESTRO_ERR_RUNTIME;
+
+        *result = maestro_value_new_int(ctx, (maestro_int_t)strlen(msg));
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
 }
 
 static int write_file(const char *path, const char *buf) {
@@ -373,10 +384,15 @@ int main(void) {
         if (!ctx)
                 return 1;
 
-        ret = maestro_ctx_add_tool(ctx, "echo", ext_len);
+        ret = maestro_register_fn(ctx, "echo", ext_len);
 
         if (ret)
                 return 1;
+
+        if (!maestro_register_fn(ctx, "echo", ext_len)) {
+                fprintf(stderr, "duplicate external function registration succeeded\n");
+                return 1;
+        }
 
         ret = maestro_load(ctx, img);
 

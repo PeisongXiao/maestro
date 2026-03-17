@@ -1,0 +1,3 @@
+(module tests integration lib)
+(export *)
+(define (suffix s) (concat s ":tail"))

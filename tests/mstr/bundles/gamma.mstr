@@ -1,0 +1,5 @@
+(module tests bundles gamma)
+(define (host-object) external)
+(state (start)
+  (steps
+    (transition end (json (host-object)))))

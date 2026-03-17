@@ -19,6 +19,7 @@ Primary build targets:
 - `make examples`
 - `make test`
 - `make test-mstr`
+- `make test-deep`
 
 Everything is built into `build/`.
 
@@ -58,7 +59,7 @@ Compile source files:
 make examples
 ```
 
-Inspect required external tools:
+Inspect required external function bindings:
 
 ```sh
 build/maestroexts build/examples/external.mstro
@@ -75,6 +76,13 @@ Run categorized source-program tests:
 ```sh
 make test-mstr
 python3 tests/run_tests.py "tests modules caller"
+```
+
+Run deeper integration and bundle tests:
+
+```sh
+make test-deep
+python3 tests/run_tests.py --deep "tests bundles alpha"
 ```
 
 For embedded use, link against

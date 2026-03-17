@@ -8,7 +8,7 @@ BUILD = ROOT / "build"
 TEST_ROOT = ROOT / "tests" / "mstr"
 
 
-CASES = {
+SHALLOW_CASES = {
     "basics": [
         {
             "module": "tests basics hello",
@@ -119,6 +119,54 @@ CASES = {
     ],
 }
 
+DEEP_SUITES = {
+    "integration": {
+        "compile": [("dir", TEST_ROOT / "integration")],
+        "externals": [
+            "host-bool",
+            "host-check",
+            "host-float",
+            "host-int",
+            "host-list",
+            "host-object",
+            "host-string",
+            "host-symbol",
+        ],
+        "cases": [
+            {
+                "module": "tests integration main",
+                "result": "{\"seen\":[\"Ada\",\"yes\"],\"tag\":\"worker\"}:tail",
+            },
+            {
+                "module": "tests integration accessors",
+                "result": "checked:{\"user\":{\"name\":\"Ada\",\"meta\":{\"active\":\"yes\"}},\"scores\":[1,2,3]}",
+            },
+        ],
+    },
+    "bundles": {
+        "compile": [("dir", TEST_ROOT / "bundles")],
+        "externals": ["echo", "host-object"],
+        "cases": [
+            {
+                "module": "tests bundles alpha",
+                "result": "{\"name\":\"alpha\",\"msg\":\"host\"}",
+            },
+            {
+                "module": "tests bundles beta",
+                "result": "6",
+            },
+            {
+                "module": "tests bundles delta",
+                "result": "delta:ok",
+            },
+            {
+                "module": "tests bundles gamma",
+                "result": "{\"user\":{\"name\":\"Ada\",\"meta\":{\"active\":\"yes\"}},\"scores\":[1,2,3]}",
+            },
+        ],
+    },
+}
+
 
 def normalize_module(text: str) -> str:
     return " ".join(part for part in text.replace(".", " ").split() if part)
@@ -150,36 +198,51 @@ def run(cmd: list[str], cwd: pathlib.Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True)
 
 
-def ensure_artifact(category: str) -> pathlib.Path:
-    artifact = BUILD / "tests" / f"{category}.mstro"
+def compile_artifact(name: str, specs: list[tuple[str, pathlib.Path]]) -> pathlib.Path:
+    artifact = BUILD / "tests" / f"{name}.mstro"
+    cmd = [str(BUILD / "maestroc")]
+
     artifact.parent.mkdir(parents=True, exist_ok=True)
-    src_dir = TEST_ROOT / category
-    res = run(
-        [str(BUILD / "maestroc"), "-d", str(src_dir), "-o", str(artifact)],
-        ROOT,
-    )
+    for kind, path in specs:
+        if kind == "dir":
+            cmd.extend(["-d", str(path)])
+        elif kind == "file":
+            cmd.extend(["-f", str(path)])
+        else:
+            raise SystemExit(f"unknown compile spec kind: {kind}")
+    cmd.extend(["-o", str(artifact)])
+    res = run(cmd, ROOT)
     if res.returncode:
         sys.stderr.write(res.stdout)
         sys.stderr.write(res.stderr)
-        raise SystemExit(f"compile failed for {category}")
+        raise SystemExit(f"compile failed for {name}")
     return artifact
+
+
+def ensure_shallow_artifact(category: str) -> pathlib.Path:
+    return compile_artifact(category, [("dir", TEST_ROOT / category)])
+
+
+def ensure_deep_artifact(suite: str) -> pathlib.Path:
+    return compile_artifact(f"deep-{suite}", DEEP_SUITES[suite]["compile"])
 
 
 def check_externals(artifact: pathlib.Path, expected: list[str]) -> None:
     res = run([str(BUILD / "maestroexts"), str(artifact)], ROOT)
     if res.returncode:
         raise SystemExit(f"maestroexts failed for {artifact}")
-    got = [line.strip() for line in res.stdout.splitlines() if line.strip()]
-    if got != expected:
-        raise SystemExit(f"externals mismatch for {artifact}: got {got}, want {expected}")
+    got = sorted(line.strip() for line in res.stdout.splitlines() if line.strip())
+    want = sorted(expected)
+    if got != want:
+        raise SystemExit(f"externals mismatch for {artifact}: got {got}, want {want}")
 
 
-def selected_cases(filters: list[str]) -> dict[str, list[dict[str, object]]]:
+def selected_shallow(filters: list[str]) -> dict[str, list[dict[str, object]]]:
     if not filters:
-        return CASES
+        return SHALLOW_CASES
     normalized = {normalize_module(item) for item in filters}
     picked: dict[str, list[dict[str, object]]] = {}
-    for category, cases in CASES.items():
+    for category, cases in SHALLOW_CASES.items():
         subset = [case for case in cases if case["module"] in normalized]
         if subset:
             picked[category] = subset
@@ -189,49 +252,92 @@ def selected_cases(filters: list[str]) -> dict[str, list[dict[str, object]]]:
     return picked
 
 
+def selected_deep(filters: list[str]) -> dict[str, dict[str, object]]:
+    if not filters:
+        return DEEP_SUITES
+    normalized = {normalize_module(item) for item in filters}
+    picked: dict[str, dict[str, object]] = {}
+    for suite, spec in DEEP_SUITES.items():
+        subset = [case for case in spec["cases"] if case["module"] in normalized]
+        if subset:
+            picked[suite] = {
+                "compile": spec["compile"],
+                "externals": spec.get("externals", []),
+                "cases": subset,
+            }
+    missing = sorted(normalized - {case["module"] for spec in picked.values() for case in spec["cases"]})
+    if missing:
+        raise SystemExit(f"unknown deep test modules: {', '.join(missing)}")
+    return picked
+
+
+def run_case(artifact: pathlib.Path, case: dict[str, object]) -> None:
+    cmd = [str(BUILD / "hostrun"), str(artifact), case["module"], *case.get("args", [])]
+    res = run(cmd, ROOT)
+    if case.get("error"):
+        if res.returncode == 0:
+            raise SystemExit(f"expected runtime error for {case['module']}")
+        print(f"ok {case['module']}")
+        print("  result: <runtime error>")
+        print(f"  stdout: {res.stdout!r}")
+        print(f"  stderr: {res.stderr!r}")
+        return
+    if res.returncode:
+        sys.stderr.write(res.stdout)
+        sys.stderr.write(res.stderr)
+        raise SystemExit(f"run failed for {case['module']}")
+    sections = parse_sections(res.stdout)
+    got_result = sections.get("result", "")
+    got_stdout = sections.get("stdout", "")
+    got_stderr = sections.get("stderr", "")
+    if got_result != case["result"]:
+        raise SystemExit(
+            f"{case['module']}: result got {got_result!r}, want {case['result']!r}"
+        )
+    if got_stdout != case.get("stdout", ""):
+        raise SystemExit(
+            f"{case['module']}: stdout got {got_stdout!r}, want {case.get('stdout', '')!r}"
+        )
+    if got_stderr != case.get("stderr", ""):
+        raise SystemExit(
+            f"{case['module']}: stderr got {got_stderr!r}, want {case.get('stderr', '')!r}"
+        )
+    print(f"ok {case['module']}")
+    print(f"  result: {got_result!r}")
+    print(f"  stdout: {got_stdout!r}")
+    print(f"  stderr: {got_stderr!r}")
+
+
 def main(argv: list[str]) -> int:
-    picked = selected_cases(argv[1:])
+    deep = False
+    filters: list[str] = []
     total = 0
+
+    for arg in argv[1:]:
+        if arg == "--deep":
+            deep = True
+        else:
+            filters.append(arg)
+
+    if deep:
+        picked = selected_deep(filters)
+        for suite, spec in picked.items():
+            artifact = ensure_deep_artifact(suite)
+            if spec.get("externals"):
+                check_externals(artifact, spec["externals"])
+            for case in spec["cases"]:
+                run_case(artifact, case)
+                total += 1
+        print(f"ran {total} deep source tests")
+        return 0
+
+    picked = selected_shallow(filters)
     for category, cases in picked.items():
-        artifact = ensure_artifact(category)
+        artifact = ensure_shallow_artifact(category)
         for case in cases:
             if "externals" in case:
                 check_externals(artifact, case["externals"])
-            cmd = [str(BUILD / "hostrun"), str(artifact), case["module"], *case.get("args", [])]
-            res = run(cmd, ROOT)
-            if case.get("error"):
-                if res.returncode == 0:
-                    raise SystemExit(f"expected runtime error for {case['module']}")
-                print(f"ok {case['module']}")
-                print("  result: <runtime error>")
-                print(f"  stdout: {res.stdout!r}")
-                print(f"  stderr: {res.stderr!r}")
-                total += 1
-                continue
-            if res.returncode:
-                sys.stderr.write(res.stdout)
-                sys.stderr.write(res.stderr)
-                raise SystemExit(f"run failed for {case['module']}")
-            sections = parse_sections(res.stdout)
-            got_result = sections.get("result", "")
-            got_stdout = sections.get("stdout", "")
-            got_stderr = sections.get("stderr", "")
-            if got_result != case["result"]:
-                raise SystemExit(
-                    f"{case['module']}: result got {got_result!r}, want {case['result']!r}"
-                )
-            if got_stdout != case.get("stdout", ""):
-                raise SystemExit(
-                    f"{case['module']}: stdout got {got_stdout!r}, want {case.get('stdout', '')!r}"
-                )
-            if got_stderr != case.get("stderr", ""):
-                raise SystemExit(
-                    f"{case['module']}: stderr got {got_stderr!r}, want {case.get('stderr', '')!r}"
-                )
-            print(f"ok {case['module']}")
-            print(f"  result: {got_result!r}")
-            print(f"  stdout: {got_stdout!r}")
-            print(f"  stderr: {got_stderr!r}")
+            run_case(artifact, case)
             total += 1
     print(f"ran {total} source tests")
     return 0

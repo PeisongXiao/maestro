@@ -39,7 +39,7 @@ enum {
         MAESTRO_VERR_OUTPUT = 1ULL << 1,
         MAESTRO_VERR_ALLOC = 1ULL << 2,
         MAESTRO_VERR_CAP = 1ULL << 3,
-        MAESTRO_VERR_TOOL = 1ULL << 4,
+        MAESTRO_VERR_FN = 1ULL << 4,
 };
 
 enum maestro_value_type {
@@ -81,6 +81,8 @@ typedef struct maestro_ast_node maestro_ast_node;
 typedef struct maestro_ast_kv maestro_ast_kv;
 
 typedef int (*maestro_output)(maestro_ctx *ctx, const char *msg);
+typedef int (*maestro_fn)(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                          maestro_value **result);
 typedef void *(*maestro_alloc_fn)(size_t size);
 typedef void (*maestro_free_fn)(void *ptr);
 

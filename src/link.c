@@ -324,6 +324,14 @@ static int collect_externals(maestro_ast *ast, uint32_t mod_idx,
                 ext.mod_idx = mod_idx;
                 ext.def_idx = i;
 
+                for (idx = 0; idx < exts->nr; idx++) {
+                        if (exts->v[idx].ident_id == ext.ident_id)
+                                break;
+                }
+
+                if (idx < exts->nr)
+                        continue;
+
                 if (ext_vec_push(exts, ext, &idx))
                         return -1;
         }

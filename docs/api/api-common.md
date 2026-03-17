@@ -98,7 +98,7 @@ The public validation flags are:
 - `MAESTRO_VERR_OUTPUT`
 - `MAESTRO_VERR_ALLOC`
 - `MAESTRO_VERR_CAP`
-- `MAESTRO_VERR_TOOL`
+- `MAESTRO_VERR_FN`
 
 These are returned by the runtime validation API.
 
@@ -164,7 +164,19 @@ The public callback type used for:
 - program-visible `print`
 - program-visible `log`
 - VM logging
-- external tool bindings
+
+### `maestro_fn`
+
+```c
+typedef int (*maestro_fn)(maestro_ctx *ctx, maestro_value **args,
+                          size_t argc, maestro_value **result);
+```
+
+The public callback type used for external function bindings.
+
+The callback receives borrowed input argument handles for the duration
+of the call and returns a runtime-owned result handle through
+`result`.
 
 ### `maestro_alloc_fn`
 
