@@ -1,0 +1,4 @@
+(module tests dll int)
+(define (dll-int) external)
+(state (start)
+  (transition end (dll-int)))

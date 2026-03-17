@@ -7,6 +7,7 @@ Related API docs:
 
 - [`api-compile.md`](api-compile.md)
 - [`api-runtime.md`](api-runtime.md)
+- [`../extension-guide.md`](../extension-guide.md)
 
 Canonical headers:
 
@@ -55,6 +56,15 @@ The default string used to derive the default artifact magic.
 ```
 
 The public library/artifact version constant.
+
+### `MAESTRO_DLL_INIT_SYMBOL`
+
+```c
+#define MAESTRO_DLL_INIT_SYMBOL "maestro_dll_init"
+```
+
+The required exported symbol name for POSIX `.so` runtime extension
+libraries.
 
 ### `MAESTRO_DEFAULT_MAGIC`
 
@@ -177,6 +187,18 @@ The public callback type used for external function bindings.
 The callback receives borrowed input argument handles for the duration
 of the call and returns a runtime-owned result handle through
 `result`.
+
+### `maestro_dll_init_fn`
+
+```c
+typedef int (*maestro_dll_init_fn)(maestro_ctx *ctx);
+```
+
+The public initializer typedef for `.so` extension libraries.
+
+The initializer is resolved from `MAESTRO_DLL_INIT_SYMBOL` and is
+expected to register external function bindings with
+`maestro_register_fn()`.
 
 ### `maestro_alloc_fn`
 

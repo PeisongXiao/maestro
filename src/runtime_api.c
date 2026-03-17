@@ -30,9 +30,15 @@ void maestro_ctx_free(maestro_ctx *ctx) {
         if (!ctx)
                 return;
 
+        for (i = 0; i < ctx->dll_nr; i++) {
+                if (ctx->dll_handles[i])
+                        dlclose(ctx->dll_handles[i]);
+        }
+
         for (i = 0; i < ctx->fn_nr; i++)
                 ctx->dealloc(ctx->fns[i].name);
 
+        ctx->dealloc(ctx->dll_handles);
         ctx->dealloc(ctx->fns);
         ctx->dealloc((void *)ctx->ext_names_cache);
         free(ctx);
@@ -116,6 +122,58 @@ int maestro_register_fn(maestro_ctx *ctx, const char *name,
         ctx->fns[ctx->fn_nr].name = dup;
         ctx->fns[ctx->fn_nr].fn = fn;
         ctx->fn_nr++;
+        return 0;
+}
+
+int maestro_ctx_load_dll(maestro_ctx *ctx, const char *path) {
+        maestro_dll_init_fn init;
+        void *handle;
+        void **nv;
+        int ret;
+
+        if (!ctx || !path || !*path)
+                return MAESTRO_ERR_RUNTIME;
+
+        handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+
+        if (!handle)
+                return MAESTRO_ERR_RUNTIME;
+
+        init = (maestro_dll_init_fn)dlsym(handle, MAESTRO_DLL_INIT_SYMBOL);
+
+        if (!init) {
+                dlclose(handle);
+                return MAESTRO_ERR_RUNTIME;
+        }
+
+        if (ctx->dll_nr == ctx->dll_cap) {
+                size_t ncap = ctx->dll_cap ? ctx->dll_cap * 2 : 8;
+
+                nv = ctx->alloc(ncap * sizeof(*nv));
+
+                if (!nv) {
+                        dlclose(handle);
+                        return MAESTRO_ERR_NOMEM;
+                }
+
+                if (ctx->dll_handles) {
+                        memcpy(nv, ctx->dll_handles,
+                               ctx->dll_nr * sizeof(*nv));
+                        ctx->dealloc(ctx->dll_handles);
+                }
+
+                ctx->dll_handles = nv;
+                ctx->dll_cap = ncap;
+        }
+
+        ret = init(ctx);
+
+        if (ret) {
+                dlclose(handle);
+                return ret;
+        }
+
+        ctx->dll_handles[ctx->dll_nr++] = handle;
         return 0;
 }
 

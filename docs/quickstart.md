@@ -46,7 +46,8 @@ Useful options:
 
 ## Inspect Required Externals
 
-Before embedding a bundle, inspect its required external function bindings:
+Before embedding a bundle, inspect its required external function
+bindings:
 
 ```sh
 build/maestroexts build/examples/external.mstro
@@ -54,17 +55,24 @@ build/maestroexts build/examples/external.mstro
 
 ## Run a Program
 
-Use [`build/maestrovm`](../build/maestrovm) to load and run a module
-from the artifact:
+Use [`build/maestrovm`](../build/maestrovm) to compile or load an
+artifact, validate it, and optionally run a module:
 
 ```sh
-build/maestrovm build/examples/modules.mstro "app caller"
+build/maestrovm -d examples/modules -r "app caller" ""
 ```
 
-Note that [`build/maestrovm`](../build/maestrovm) is a thin runtime
-wrapper. Real embedded use should load the artifact through the
-library and register required external function bindings in
-`maestro_ctx`.
+For extension-driven runs, load `.so` libraries with `-l` or `-d`:
+
+```sh
+build/maestrovm \
+  -l build/tests/dll/plugin_ok.so \
+  -d tests/mstr/dll \
+  -r "tests dll describe" "42 2.5 \"hi\" 'sym {\"user\":{\"name\":\"Ada\"}}"
+```
+
+If `-r` is omitted, `maestrovm` stays in validate-only mode and
+reports success to `stderr`.
 
 ## Run Source Suites
 
@@ -88,6 +96,7 @@ python3 tests/run_tests.py "tests modules caller" "tests json parse"
 - [`docs/api/api-common.md`](api/api-common.md)
 - [`docs/api/api-runtime.md`](api/api-runtime.md)
 - [`docs/api/api-compile.md`](api/api-compile.md)
+- [`docs/extension-guide.md`](extension-guide.md)
 - [`docs/design/language-specs.md`](design/language-specs.md)
 - [`docs/design/maestro-design.md`](design/maestro-design.md)
-- [`docs/tools/maestro-tools.md`](tools/maestro-tools.md)
+- [`docs/tools/tools-overview.md`](tools/tools-overview.md)

@@ -1,0 +1,4 @@
+(module tests dll describe)
+(define (dll-describe i f s sym obj) external)
+(state (start i f s sym obj)
+  (transition end (dll-describe i f s sym (json obj))))

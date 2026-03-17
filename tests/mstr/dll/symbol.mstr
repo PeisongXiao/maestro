@@ -1,0 +1,4 @@
+(module tests dll symbol)
+(define (dll-symbol) external)
+(state (start)
+  (transition end (dll-symbol)))

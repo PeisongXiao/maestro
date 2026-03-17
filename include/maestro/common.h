@@ -15,6 +15,7 @@ typedef float maestro_float_t;
 
 #define MAESTRO_MAGIC_STRING "maestro"
 #define MAESTRO_VERSION 1U
+#define MAESTRO_DLL_INIT_SYMBOL "maestro_dll_init"
 
 enum {
         MAESTRO_OK = 0,
@@ -83,6 +84,7 @@ typedef struct maestro_ast_kv maestro_ast_kv;
 typedef int (*maestro_output)(maestro_ctx *ctx, const char *msg);
 typedef int (*maestro_fn)(maestro_ctx *ctx, maestro_value **args, size_t argc,
                           maestro_value **result);
+typedef int (*maestro_dll_init_fn)(maestro_ctx *ctx);
 typedef void *(*maestro_alloc_fn)(size_t size);
 typedef void (*maestro_free_fn)(void *ptr);
 

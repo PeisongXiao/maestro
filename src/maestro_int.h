@@ -5,6 +5,7 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <math.h>
 #include <stdarg.h>
@@ -124,6 +125,9 @@ struct maestro_ctx {
         struct maestro_fn_binding *fns;
         size_t fn_nr;
         size_t fn_cap;
+        void **dll_handles;
+        size_t dll_nr;
+        size_t dll_cap;
         const char **ext_names_cache;
         void *priv;
 };

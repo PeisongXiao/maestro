@@ -46,6 +46,7 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic, uint64_
 maestro_ctx *maestro_ctx_new(void);
 void maestro_ctx_free(maestro_ctx *ctx);
 int maestro_register_fn(maestro_ctx *ctx, const char *name, maestro_fn fn);
+int maestro_ctx_load_dll(maestro_ctx *ctx, const char *path);
 int maestro_load(maestro_ctx *ctx, const void *src);
 void maestro_ctx_set_image_len(maestro_ctx *ctx, size_t len);
 uint64_t maestro_validate(maestro_ctx *ctx, FILE *err);
@@ -113,6 +114,11 @@ External function bindings are registered explicitly with
 `maestro_register_fn()`. The callback receives borrowed input
 arguments and returns a runtime-owned `maestro_value *` through its
 result pointer.
+
+POSIX `.so` extensions attach to a runtime context through
+`maestro_ctx_load_dll()`. Each library must export
+`maestro_dll_init(maestro_ctx *ctx)` and register its function
+bindings during that initializer call.
 
 ## Artifact Model
 
@@ -196,9 +202,9 @@ bitmap. `maestro_validate()` checks that the VM capability bitmap in
 
 ## Externals
 
-Required external function bindings are recorded in a dedicated section before the node
-table. That allows fast inspection and validation without walking the
-code graph.
+Required external function bindings are recorded in a dedicated
+section before the node table. That allows fast inspection and
+validation without walking the code graph.
 
 Module paths are stored as segmented path tables in the image rather
 than flattened dotted strings. Resolution compares path segments
@@ -220,6 +226,7 @@ Primary targets are:
 - `make examples`
 - `make test`
 - `make test-mstr`
+- `make test-deep`
 
 Outputs are written under [`build/`](../../build/), including:
 

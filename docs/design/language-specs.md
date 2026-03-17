@@ -1119,8 +1119,8 @@ Example:
 
 ## External Function Bindings
 
-External function bindings represent host-provided capabilities and are
-declared with `external`.
+External function bindings represent host-provided capabilities and
+are declared with `external`.
 
 Example:
 
@@ -1128,8 +1128,8 @@ Example:
 (define (search query) external)
 ```
 
-The runtime expects the host environment to provide implementations for
-these functions.
+The runtime expects the host environment to provide implementations
+for these functions.
 
 ## Output
 

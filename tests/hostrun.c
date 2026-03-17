@@ -79,8 +79,10 @@ static int fn_echo(maestro_ctx *ctx, maestro_value **args, size_t argc,
 static int fn_host_int(maestro_ctx *ctx, maestro_value **args, size_t argc,
                        maestro_value **result) {
         (void)args;
+
         if (!ctx || !result || argc != 0)
                 return MAESTRO_ERR_RUNTIME;
+
         *result = maestro_value_new_int(ctx, 7);
         return *result ? 0 : MAESTRO_ERR_NOMEM;
 }
@@ -88,8 +90,10 @@ static int fn_host_int(maestro_ctx *ctx, maestro_value **args, size_t argc,
 static int fn_host_float(maestro_ctx *ctx, maestro_value **args, size_t argc,
                          maestro_value **result) {
         (void)args;
+
         if (!ctx || !result || argc != 0)
                 return MAESTRO_ERR_RUNTIME;
+
         *result = maestro_value_new_float(ctx, 2.5f);
         return *result ? 0 : MAESTRO_ERR_NOMEM;
 }
@@ -97,8 +101,10 @@ static int fn_host_float(maestro_ctx *ctx, maestro_value **args, size_t argc,
 static int fn_host_bool(maestro_ctx *ctx, maestro_value **args, size_t argc,
                         maestro_value **result) {
         (void)args;
+
         if (!ctx || !result || argc != 0)
                 return MAESTRO_ERR_RUNTIME;
+
         *result = maestro_value_new_bool(ctx, true);
         return *result ? 0 : MAESTRO_ERR_NOMEM;
 }
@@ -106,8 +112,10 @@ static int fn_host_bool(maestro_ctx *ctx, maestro_value **args, size_t argc,
 static int fn_host_string(maestro_ctx *ctx, maestro_value **args, size_t argc,
                           maestro_value **result) {
         (void)args;
+
         if (!ctx || !result || argc != 0)
                 return MAESTRO_ERR_RUNTIME;
+
         *result = maestro_value_new_string(ctx, "host");
         return *result ? 0 : MAESTRO_ERR_NOMEM;
 }
@@ -115,8 +123,10 @@ static int fn_host_string(maestro_ctx *ctx, maestro_value **args, size_t argc,
 static int fn_host_symbol(maestro_ctx *ctx, maestro_value **args, size_t argc,
                           maestro_value **result) {
         (void)args;
+
         if (!ctx || !result || argc != 0)
                 return MAESTRO_ERR_RUNTIME;
+
         *result = maestro_value_new_symbol(ctx, "token");
         return *result ? 0 : MAESTRO_ERR_NOMEM;
 }
@@ -127,6 +137,7 @@ static int fn_host_list(maestro_ctx *ctx, maestro_value **args, size_t argc,
         maestro_value *nested;
 
         (void)args;
+
         if (!ctx || !result || argc != 0)
                 return MAESTRO_ERR_RUNTIME;
 
@@ -134,11 +145,13 @@ static int fn_host_list(maestro_ctx *ctx, maestro_value **args, size_t argc,
         nested = maestro_value_new_list(ctx);
 
         if (!list || !nested) {
-            if (list)
-                    maestro_value_free(ctx, list);
-            if (nested)
-                    maestro_value_free(ctx, nested);
-            return MAESTRO_ERR_NOMEM;
+                if (list)
+                        maestro_value_free(ctx, list);
+
+                if (nested)
+                        maestro_value_free(ctx, nested);
+
+                return MAESTRO_ERR_NOMEM;
         }
 
         if (value_list_push_take(ctx, nested, maestro_value_new_int(ctx, 1)) ||
@@ -162,11 +175,13 @@ static int fn_host_list(maestro_ctx *ctx, maestro_value **args, size_t argc,
 static int fn_host_object(maestro_ctx *ctx, maestro_value **args, size_t argc,
                           maestro_value **result) {
         (void)args;
+
         if (!ctx || !result || argc != 0)
                 return MAESTRO_ERR_RUNTIME;
+
         *result = maestro_value_new_json(
-                ctx,
-                "{\"user\":{\"name\":\"Ada\",\"meta\":{\"active\":\"yes\"}},\"scores\":[1,2,3]}");
+                          ctx,
+                          "{\"user\":{\"name\":\"Ada\",\"meta\":{\"active\":\"yes\"}},\"scores\":[1,2,3]}");
         return *result ? 0 : MAESTRO_ERR_NOMEM;
 }
 
@@ -184,13 +199,16 @@ static int fn_host_check(maestro_ctx *ctx, maestro_value **args, size_t argc,
 
         if (maestro_value_as_int(args[0], &i) || i != 7)
                 return MAESTRO_ERR_RUNTIME;
+
         if (maestro_value_as_float(args[1], &f) || f != 2.5f)
                 return MAESTRO_ERR_RUNTIME;
+
         if (maestro_value_as_bool(args[2], &b) || !b)
                 return MAESTRO_ERR_RUNTIME;
 
         s = maestro_value_as_string(args[3]);
         sym = maestro_value_as_symbol(args[4]);
+
         if (!s || strcmp(s, "host") || !sym || strcmp(sym, "token"))
                 return MAESTRO_ERR_RUNTIME;
 
@@ -200,23 +218,31 @@ static int fn_host_check(maestro_ctx *ctx, maestro_value **args, size_t argc,
         if (!maestro_value_list_get(args[5], 0) ||
             maestro_value_as_int(maestro_value_list_get(args[5], 0), &i) || i != 7)
                 return MAESTRO_ERR_RUNTIME;
+
         if (!maestro_value_list_get(args[5], 1) ||
             maestro_value_as_float(maestro_value_list_get(args[5], 1), &f) || f != 2.5f)
                 return MAESTRO_ERR_RUNTIME;
+
         if (!maestro_value_list_get(args[5], 2) ||
             maestro_value_as_bool(maestro_value_list_get(args[5], 2), &b) || !b)
                 return MAESTRO_ERR_RUNTIME;
+
         s = maestro_value_as_string(maestro_value_list_get(args[5], 3));
         sym = maestro_value_as_symbol(maestro_value_list_get(args[5], 4));
+
         if (!s || strcmp(s, "Ada") || !sym || strcmp(sym, "token"))
                 return MAESTRO_ERR_RUNTIME;
 
         nested = maestro_value_list_get(args[5], 5);
+
         if (!nested || maestro_value_list_len(nested) != 2)
                 return MAESTRO_ERR_RUNTIME;
+
         if (maestro_value_as_int(maestro_value_list_get(nested, 0), &i) || i != 1)
                 return MAESTRO_ERR_RUNTIME;
+
         s = maestro_value_as_string(maestro_value_list_get(nested, 1));
+
         if (!s || strcmp(s, "nest"))
                 return MAESTRO_ERR_RUNTIME;
 
@@ -429,6 +455,7 @@ int main(int argc, char **argv) {
 
         maestro_ctx_set_output(ctx, capture_stdout, capture_stderr);
         maestro_ctx_set_vm_logger(ctx, capture_stderr);
+
         if (maestro_register_fn(ctx, "echo", fn_echo) ||
             maestro_register_fn(ctx, "host-int", fn_host_int) ||
             maestro_register_fn(ctx, "host-float", fn_host_float) ||

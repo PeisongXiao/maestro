@@ -7,6 +7,7 @@ Related API docs:
 
 - [`api-common.md`](api-common.md)
 - [`api-compile.md`](api-compile.md)
+- [`../extension-guide.md`](../extension-guide.md)
 
 Canonical umbrella header:
 
@@ -117,6 +118,18 @@ Registers one external function binding by name.
 The registered callback receives borrowed input argument handles and
 returns a runtime-owned result handle through `result`.
 
+### `maestro_ctx_load_dll`
+
+```c
+int maestro_ctx_load_dll(maestro_ctx *ctx, const char *path);
+```
+
+Loads a POSIX `.so` extension library, resolves
+`MAESTRO_DLL_INIT_SYMBOL`, and invokes the exported initializer.
+
+The library remains attached to the context until `maestro_ctx_free()`
+releases it.
+
 ## Loading and Validation
 
 ### `maestro_load`
@@ -187,6 +200,10 @@ Result rules:
 - the caller owns that returned handle
 - the caller must release it with `maestro_value_free(ctx,
   result_value)`
+
+For `.so` extension callbacks, the same result ownership rule applies:
+the callback creates a runtime-owned result handle and the runtime
+later frees it after use.
 
 ## Value Construction
 
