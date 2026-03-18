@@ -114,6 +114,7 @@ When `-r` is present:
 - VM runtime failures emit `ERROR: ...` lines through the configured
   VM logger, including invalid builtin use and invalid JSON snippet
   evaluation
+- the first detected runtime error aborts execution immediately
 - runtime failure prints an error message to `stderr` and exits non-zero
 
 ## Static Argument Grammar

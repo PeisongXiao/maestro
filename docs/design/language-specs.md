@@ -1186,6 +1186,9 @@ data object. Invalid input is a runtime error.
 JSON string. The object must only contain JSON-serializable values.
 Invalid input is a runtime error.
 
+When a runtime error occurs during evaluation, Maestro aborts the
+current run immediately.
+
 Examples:
 
 ```lisp

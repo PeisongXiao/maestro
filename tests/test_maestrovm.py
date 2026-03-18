@@ -28,13 +28,21 @@ def expect_ok(cmd: list[str], stdout: str | None = None, stderr_contains: str | 
         )
 
 
-def expect_fail(cmd: list[str], stderr_contains: str | None = None) -> None:
+def expect_fail(
+    cmd: list[str],
+    stderr_contains: str | None = None,
+    stderr_not_contains: str | None = None,
+) -> None:
     res = run(cmd)
     if res.returncode == 0:
         raise SystemExit(f"expected failure: {' '.join(cmd)}")
     if stderr_contains is not None and stderr_contains not in res.stderr:
         raise SystemExit(
             f"stderr mismatch for failing command {' '.join(cmd)}: missing {stderr_contains!r} in {res.stderr!r}"
+        )
+    if stderr_not_contains is not None and stderr_not_contains in res.stderr:
+        raise SystemExit(
+            f"stderr mismatch for failing command {' '.join(cmd)}: unexpected {stderr_not_contains!r} in {res.stderr!r}"
         )
 
 
@@ -98,6 +106,11 @@ def main() -> int:
     expect_fail(
         [maestrovm, "-f", str(ROOT / "tests" / "mstr" / "json" / "json-call-invalid.mstr"), "-r", "tests json json-call-invalid", ""],
         stderr_contains='ERROR: builtin json: argument must be a valid JSON-compatible object',
+    )
+    expect_fail(
+        [maestrovm, "-f", str(ROOT / "tests" / "mstr" / "json" / "invalid.mstr"), "-r", "tests json invalid", ""],
+        stderr_contains='ERROR: json snippet field "tags" is not JSON-compatible',
+        stderr_not_contains='builtin get: object root is invalid',
     )
 
     if tmp_tree.exists():

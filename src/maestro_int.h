@@ -19,6 +19,7 @@ enum {
         CTRL_OK = 0,
         CTRL_TRANSITION = 1,
         CTRL_END = 2,
+        CTRL_ERROR = 3,
 };
 
 enum {

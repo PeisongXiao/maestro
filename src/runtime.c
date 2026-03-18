@@ -220,6 +220,18 @@ static maestro_value v_invalid(void) {
         return v;
 }
 
+static maestro_value runtime_error_value(struct eval_res *eres) {
+	if (eres)
+		eres->ctrl = CTRL_ERROR;
+
+	return v_invalid();
+}
+
+static int eval_failed(struct eval_res *eres, maestro_value v) {
+	return v.type == MAESTRO_VAL_INVALID ||
+	       (eres && eres->ctrl == CTRL_ERROR);
+}
+
 static maestro_value v_int(maestro_int_t i) {
         maestro_value v = v_invalid();
 
@@ -1921,13 +1933,13 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
         maestro_value out = v_invalid();
 
 	if (!op)
-		return out;
+		return runtime_error_value(eres);
 
         if (!strcmp(op, "steps")) {
                 for (i = 1; i < node->nr; i++) {
                         out = eval_node(rctx, mod, scope, node->first + i, eres);
 
-                        if (eres->ctrl != CTRL_OK)
+                        if (eval_failed(eres, out) || eres->ctrl != CTRL_OK)
                                 return out;
                 }
 
@@ -1939,6 +1951,10 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 
                 if (node->nr == 3 && name->type == IMG_NODE_IDENT) {
                         out = eval_node(rctx, mod, scope, node->first + 2, eres);
+
+                        if (eval_failed(eres, out) || eres->ctrl != CTRL_OK)
+                                return out;
+
                         scope_set(rctx->ctx, scope, name->str_off, out);
                         return out;
                 }
@@ -1976,9 +1992,14 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 
                         out = eval_node(rctx, mod, scope, node->first + node->nr - 1, eres);
 
+                        if (eval_failed(eres, out) || eres->ctrl != CTRL_OK) {
+                                free(path);
+                                return out;
+                        }
+
                         if (slot->type != MAESTRO_VAL_OBJECT) {
                                 free(path);
-                                return v_invalid();
+                                return runtime_error_value(eres);
                         }
 
                         obj_set(rctx->ctx, slot->v.obj, path[pn - 1], out);
@@ -1993,19 +2014,22 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 struct maestro_binding *b;
 
                 if (name->type != IMG_NODE_IDENT)
-                        return v_invalid();
+                        return runtime_error_value(eres);
 
                 b = scope_find(scope, name->str_off);
 
                 if (!b)
-                        return v_invalid();
+                        return runtime_error_value(eres);
 
                 if (node->nr == 3) {
                         out = eval_node(rctx, mod, scope, node->first + 2, eres);
 
+                        if (eval_failed(eres, out) || eres->ctrl != CTRL_OK)
+                                return out;
+
                         if (b->value.type == MAESTRO_VAL_REF) {
                                 if (ref_write(rctx->ctx, b->value.v.ref, out))
-                                        return v_invalid();
+                                        return runtime_error_value(eres);
                         } else {
                                 b->value = out;
                         }
@@ -2022,7 +2046,7 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                         path = calloc(pn, sizeof(*path));
 
                         if (!path)
-                                return v_invalid();
+                                return runtime_error_value(eres);
 
                         for (i = 0; i < pn; i++)
                                 path[i] = (char *)node_text(rctx->ctx,
@@ -2030,15 +2054,21 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 
                         if (ensure_object_path(rctx->ctx, &root, path, pn - 1, &slot)) {
                                 free(path);
-                                return v_invalid();
+                                return runtime_error_value(eres);
                         }
 
                         if (slot->type != MAESTRO_VAL_OBJECT) {
                                 free(path);
-                                return v_invalid();
+                                return runtime_error_value(eres);
                         }
 
                         out = eval_node(rctx, mod, scope, node->first + node->nr - 1, eres);
+
+                        if (eval_failed(eres, out) || eres->ctrl != CTRL_OK) {
+                                free(path);
+                                return out;
+                        }
+
                         obj_set(rctx->ctx, slot->v.obj, path[pn - 1], out);
                         b->value = root;
                         free(path);
@@ -2128,28 +2158,50 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 
         if (!strcmp(op, "transition")) {
                 if (node->nr >= 2) {
-                        maestro_value target = eval_node(rctx, mod, scope, node->first + 1, eres);
-
-                        if (target.type == MAESTRO_VAL_STATE) {
-                                eres->ctrl = CTRL_TRANSITION;
-                                eres->next_state = target.v.handle;
-
-                                if (node->nr >= 3)
-                                        eres->v = eval_node(rctx, mod, scope, node->first + 2, eres);
-
-                                return eres->v;
-                        }
-
                         if (img_node(rctx->ctx, node->first + 1)->type == IMG_NODE_IDENT &&
                             !strcmp(node_ident_name(rctx->ctx,
                                                     img_node(rctx->ctx, node->first + 1)), "end")) {
+                                struct eval_res inner = {0};
+
                                 eres->ctrl = CTRL_END;
-                                eres->v = eval_node(rctx, mod, scope, node->first + 2, eres);
+                                eres->v = eval_node(rctx, mod, scope, node->first + 2, &inner);
+
+                                if (eval_failed(&inner, eres->v) || inner.ctrl != CTRL_OK)
+                                        return runtime_error_value(eres);
+
                                 return eres->v;
+                        }
+
+                        {
+                                maestro_value target = eval_node(rctx, mod, scope,
+                                                                 node->first + 1, eres);
+
+                                if (eval_failed(eres, target))
+                                        return target;
+
+                                if (target.type == MAESTRO_VAL_STATE) {
+                                        struct eval_res inner = {0};
+
+                                        eres->ctrl = CTRL_TRANSITION;
+                                        eres->next_state = target.v.handle;
+
+                                        if (node->nr >= 3)
+                                                eres->v = eval_node(rctx, mod, scope,
+                                                                    node->first + 2, &inner);
+                                        else
+                                                eres->v = v_invalid();
+
+                                        if (node->nr >= 3 &&
+                                            (eval_failed(&inner, eres->v) ||
+                                             inner.ctrl != CTRL_OK))
+                                                return runtime_error_value(eres);
+
+                                        return eres->v;
+                                }
                         }
                 }
 
-                return v_invalid();
+                return runtime_error_value(eres);
         }
 
         if (!strcmp(op, "case")) {
@@ -2168,11 +2220,14 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 
                         out = eval_node(rctx, mod, scope, cl->first, eres);
 
+                        if (eval_failed(eres, out) || eres->ctrl != CTRL_OK)
+                                return out;
+
                         if (value_truthy(out))
                                 return eval_node(rctx, mod, scope, cl->first + 1, eres);
                 }
 
-                return v_invalid();
+                return runtime_error_value(eres);
         }
 
         if (!strcmp(op, "run")) {
@@ -2186,18 +2241,24 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 maestro_value *run_argv = NULL;
                 size_t run_argc;
 
+                if (eval_failed(&inner, prog) || inner.ctrl != CTRL_OK)
+                        return runtime_error_value(eres);
+
+                if (eval_failed(eres, run_arg) || eres->ctrl != CTRL_OK)
+                        return run_arg;
+
                 if (prog.type != MAESTRO_VAL_PROGRAM)
-                        return v_invalid();
+                        return runtime_error_value(eres);
 
                 run_mod = img_mod_by_idx(rctx->ctx, prog.v.handle->module_idx);
 
                 if (!run_mod)
-                        return v_invalid();
+                        return runtime_error_value(eres);
 
                 start = eval_ident(rctx, run_mod, NULL, "start").v.handle;
 
                 if (!start)
-                        return v_invalid();
+                        return runtime_error_value(eres);
 
                 run_argc = run_arg.type == MAESTRO_VAL_LIST ? run_arg.v.list->nr : 1;
 
@@ -2207,7 +2268,7 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 run_argv = rctx->ctx->alloc(run_argc * sizeof(*run_argv));
 
                 if (!run_argv)
-                        return v_invalid();
+                        return runtime_error_value(eres);
 
                 for (i = 0; i < run_argc; i++) {
                         maestro_value src = run_arg.type == MAESTRO_VAL_LIST ?
@@ -2223,7 +2284,7 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                                 }
 
                                 rctx->ctx->dealloc(run_argv);
-                                return v_invalid();
+                                return runtime_error_value(eres);
                         }
                 }
 
@@ -2244,7 +2305,7 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                                              img_node(rctx->ctx, node->first + node->nr - 1));
 
                 if (!m)
-                        return v_invalid();
+                        return runtime_error_value(eres);
 
                 out = eval_ident(rctx, m, NULL, name);
                 return out;
@@ -2256,7 +2317,7 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 uint32_t start_id = find_ident_id_by_name(rctx->ctx, "start");
 
                 if (!h || !prog_mod || start_id == UINT32_MAX)
-                        return v_invalid();
+                        return runtime_error_value(eres);
 
                 memset(h, 0, sizeof(*h));
                 h->kind = HANDLE_PROGRAM;
@@ -2268,9 +2329,14 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
         if (!strcmp(op, "list")) {
                 out = v_list(rctx->ctx);
 
-                for (i = 1; i < node->nr; i++)
-                        list_push(rctx->ctx, out.v.list,
-                                  eval_node(rctx, mod, scope, node->first + i, eres));
+                for (i = 1; i < node->nr; i++) {
+                        maestro_value item = eval_node(rctx, mod, scope, node->first + i, eres);
+
+                        if (eval_failed(eres, item) || eres->ctrl != CTRL_OK)
+                                return item;
+
+                        list_push(rctx->ctx, out.v.list, item);
+                }
 
                 return out;
         }
@@ -2278,6 +2344,10 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
         if (!strcmp(op, "cons")) {
                 maestro_value headv = eval_node(rctx, mod, scope, node->first + 1, eres);
                 maestro_value tailv = eval_node(rctx, mod, scope, node->first + 2, eres);
+
+                if (eval_failed(eres, headv) || eval_failed(eres, tailv) ||
+                    eres->ctrl != CTRL_OK)
+                        return v_invalid();
 
 		if (tailv.type != MAESTRO_VAL_LIST)
 			return vm_log_builtin_error(rctx, op, "second argument must be a list"), v_invalid();
@@ -2294,6 +2364,9 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 		if (!strcmp(op, "json") && node->nr == 2) {
 			maestro_value obj = deref_value(eval_node(rctx, mod, scope,
 						node->first + 1, eres));
+
+                        if (eval_failed(eres, obj) || eres->ctrl != CTRL_OK)
+                                return v_invalid();
 			char *json = json_serialize_object(obj);
 
 			if (!json)
@@ -2309,6 +2382,9 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 		if (!strcmp(op, "json-parse") && node->nr == 2) {
 			maestro_value s = deref_value(eval_node(rctx, mod, scope,
 						node->first + 1, eres));
+
+                        if (eval_failed(eres, s) || eres->ctrl != CTRL_OK)
+                                return v_invalid();
 
 			if (s.type != MAESTRO_VAL_STRING)
 				return vm_log_builtin_error(rctx, op,
@@ -2329,6 +2405,9 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 for (i = 1; i < node->nr; i++) {
                         out = eval_node(rctx, mod, scope, node->first + i, eres);
 
+                        if (eval_failed(eres, out) || eres->ctrl != CTRL_OK)
+                                return out;
+
                         if (!strcmp(op, "and")) {
                                 accum = accum && value_truthy(out);
 
@@ -2347,6 +2426,8 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 
         if (!strcmp(op, "not")) {
                 out = eval_node(rctx, mod, scope, node->first + 1, eres);
+                if (eval_failed(eres, out) || eres->ctrl != CTRL_OK)
+                        return out;
                 return v_bool(!value_truthy(out));
         }
 
@@ -2358,6 +2439,11 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 
                 for (i = 0; i < argc; i++)
                         argv[i] = eval_node(rctx, mod, scope, node->first + 1 + i, eres);
+
+                for (i = 0; i < argc; i++) {
+                        if (eval_failed(eres, argv[i]) || eres->ctrl != CTRL_OK)
+                                goto out;
+                }
         }
 
         callee = eval_ident(rctx, mod, scope, op);
@@ -2731,32 +2817,46 @@ static maestro_value eval_node(struct run_ctx *rctx, struct img_mod *mod,
                                struct maestro_scope *scope, uint32_t idx,
                                struct eval_res *eres) {
         struct img_node *node = img_node(rctx->ctx, idx);
+        maestro_value out;
 
         switch (node->type) {
         case IMG_NODE_INT:
-                return v_int(node->i);
+                out = v_int(node->i);
+                break;
 
         case IMG_NODE_FLOAT:
-                return v_float(node->f);
+                out = v_float(node->f);
+                break;
 
         case IMG_NODE_STRING:
-                return v_string_borrow(rctx->ctx, img_str(rctx->ctx, node->str_off));
+                out = v_string_borrow(rctx->ctx, img_str(rctx->ctx, node->str_off));
+                break;
 
         case IMG_NODE_IDENT:
-                return eval_ident(rctx, mod, scope, node_ident_name(rctx->ctx, node));
+                out = eval_ident(rctx, mod, scope, node_ident_name(rctx->ctx, node));
+                break;
 
         case IMG_NODE_SYMBOL:
-                return v_symbol_borrow(rctx->ctx, node_ident_name(rctx->ctx, node));
+                out = v_symbol_borrow(rctx->ctx, node_ident_name(rctx->ctx, node));
+                break;
 
         case IMG_NODE_JSON:
-                return eval_json(rctx, mod, scope, node, eres);
+                out = eval_json(rctx, mod, scope, node, eres);
+                break;
 
         case IMG_NODE_FORM:
-                return eval_call(rctx, mod, scope, node, eres);
+                out = eval_call(rctx, mod, scope, node, eres);
+                break;
 
         default:
-                return v_invalid();
+                out = v_invalid();
+                break;
         }
+
+        if (out.type == MAESTRO_VAL_INVALID && eres && eres->ctrl == CTRL_OK)
+                eres->ctrl = CTRL_ERROR;
+
+        return out;
 }
 
 static maestro_value run_program(struct run_ctx *parent, struct img_mod *mod,
@@ -2815,6 +2915,12 @@ static maestro_value run_state(struct run_ctx *rctx, struct img_mod *mod,
         for (;;) {
                 eres.ctrl = CTRL_OK;
                 v = eval_node(rctx, mod, scope, state->body_idx, &eres);
+
+                if (eres.ctrl == CTRL_ERROR ||
+                    (v.type == MAESTRO_VAL_INVALID &&
+                     eres.ctrl != CTRL_TRANSITION))
+                        return v_invalid();
+
                 {
                         maestro_value ls = v_object(rctx->ctx);
                         obj_set(rctx->ctx, ls.v.obj, "state",
