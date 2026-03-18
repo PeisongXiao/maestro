@@ -1,7 +1,45 @@
 #include "maestro_int.h"
 
+static void vm_log_error(maestro_ctx *ctx, const char *fmt, ...) {
+	char buf[512];
+	va_list ap;
+	size_t off = 0;
+	int n;
+
+	if (!ctx || !ctx->vm_logger)
+		return;
+
+	memcpy(buf, "ERROR: ", 7);
+	off = 7;
+	va_start(ap, fmt);
+	n = vsnprintf(buf + off, sizeof(buf) - off, fmt, ap);
+	va_end(ap);
+
+	if (n < 0)
+		return;
+
+	if ((size_t)n + off >= sizeof(buf)) {
+		buf[sizeof(buf) - 2] = '\n';
+		buf[sizeof(buf) - 1] = '\0';
+	} else if (!n || buf[off + (size_t)n - 1] != '\n') {
+		buf[off + (size_t)n] = '\n';
+		buf[off + (size_t)n + 1] = '\0';
+	}
+
+	ctx->vm_logger(ctx, buf);
+}
+
+static void vm_log_builtin_error(struct run_ctx *rctx, const char *op,
+				 const char *msg) {
+	if (!rctx)
+		return;
+
+	vm_log_error(rctx->ctx, "builtin %s: %s", op ? op : "<unknown>",
+		     msg ? msg : "invalid use");
+}
+
 static const char *img_str(maestro_ctx *ctx, uint32_t off) {
-        return ctx->img_strs + off;
+	return ctx->img_strs + off;
 }
 
 static const char *img_ident_name(maestro_ctx *ctx, uint32_t id) {
@@ -1728,11 +1766,17 @@ static maestro_value eval_json(struct run_ctx *rctx, struct img_mod *mod,
                 maestro_value v = eval_node(rctx, mod, scope, kv->val_idx, eres);
 
                 if (!json_snippet_value_ok(v)) {
+                        vm_log_error(rctx->ctx,
+                                     "json snippet field \"%s\" is not JSON-compatible",
+                                     img_str(rctx->ctx, kv->key_off));
                         maestro_value_reset(rctx->ctx, &obj);
                         return v_invalid();
                 }
 
                 if (obj_set(rctx->ctx, obj.v.obj, img_str(rctx->ctx, kv->key_off), v)) {
+                        vm_log_error(rctx->ctx,
+                                     "unable to store json snippet field \"%s\"",
+                                     img_str(rctx->ctx, kv->key_off));
                         maestro_value_reset(rctx->ctx, &obj);
                         return v_invalid();
                 }
@@ -1858,6 +1902,12 @@ static int builtin_numeric(maestro_ctx *ctx, const char *op,
         return 0;
 }
 
+#define BUILTIN_FAIL(MSG)            \
+	do {                         \
+		vm_log_builtin_error(rctx, op, MSG); \
+		goto out;               \
+	} while (0)
+
 static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                                struct maestro_scope *scope, struct img_node *node,
                                struct eval_res *eres) {
@@ -1870,8 +1920,8 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
         size_t i;
         maestro_value out = v_invalid();
 
-        if (!op)
-                return out;
+	if (!op)
+		return out;
 
         if (!strcmp(op, "steps")) {
                 for (i = 1; i < node->nr; i++) {
@@ -2000,8 +2050,8 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 struct maestro_binding *b;
                 maestro_value cur;
 
-                if (node->nr < 3)
-                        return v_invalid();
+		if (node->nr < 3)
+			return vm_log_builtin_error(rctx, op, "expected object and at least one path segment"), v_invalid();
 
                 b = scope_find(scope, img_node(rctx->ctx, node->first + 1)->str_off);
 
@@ -2012,19 +2062,19 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                                          node_ident_name(rctx->ctx,
                                                          img_node(rctx->ctx, node->first + 1)));
 
-                if (!cur.type)
-                        return v_invalid();
+		if (!cur.type)
+			return vm_log_builtin_error(rctx, op, "object root is invalid"), v_invalid();
 
-                for (i = 2; i < node->nr; i++) {
-                        if (cur.type != MAESTRO_VAL_OBJECT)
-                                return v_invalid();
+		for (i = 2; i < node->nr; i++) {
+			if (cur.type != MAESTRO_VAL_OBJECT)
+				return vm_log_builtin_error(rctx, op, "path traversal requires objects at every segment"), v_invalid();
 
                         cur = obj_get(cur.v.obj,
                                       node_text(rctx->ctx, img_node(rctx->ctx, node->first + i)));
 
-                        if (!cur.type)
-                                return v_invalid();
-                }
+			if (!cur.type)
+				return vm_log_builtin_error(rctx, op, "object path segment not found"), v_invalid();
+		}
 
                 return cur;
         }
@@ -2229,8 +2279,8 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 maestro_value headv = eval_node(rctx, mod, scope, node->first + 1, eres);
                 maestro_value tailv = eval_node(rctx, mod, scope, node->first + 2, eres);
 
-                if (tailv.type != MAESTRO_VAL_LIST)
-                        return v_invalid();
+		if (tailv.type != MAESTRO_VAL_LIST)
+			return vm_log_builtin_error(rctx, op, "second argument must be a list"), v_invalid();
 
                 out = v_list(rctx->ctx);
                 list_push(rctx->ctx, out.v.list, headv);
@@ -2241,26 +2291,34 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 return out;
         }
 
-        if (!strcmp(op, "json") && node->nr == 2) {
-                maestro_value obj = eval_node(rctx, mod, scope, node->first + 1, eres);
-                char *json = json_serialize_object(obj);
+		if (!strcmp(op, "json") && node->nr == 2) {
+			maestro_value obj = deref_value(eval_node(rctx, mod, scope,
+						node->first + 1, eres));
+			char *json = json_serialize_object(obj);
 
-                if (!json)
-                        return v_invalid();
+			if (!json)
+				return vm_log_builtin_error(rctx, op,
+					       "argument must be a valid JSON-compatible object"),
+				       v_invalid();
 
                 out = v_string(rctx->ctx, json);
                 free(json);
                 return out;
         }
 
-        if (!strcmp(op, "json-parse") && node->nr == 2) {
-                maestro_value s = eval_node(rctx, mod, scope, node->first + 1, eres);
+		if (!strcmp(op, "json-parse") && node->nr == 2) {
+			maestro_value s = deref_value(eval_node(rctx, mod, scope,
+						node->first + 1, eres));
 
-                if (s.type != MAESTRO_VAL_STRING)
-                        return v_invalid();
+			if (s.type != MAESTRO_VAL_STRING)
+				return vm_log_builtin_error(rctx, op,
+					       "argument must be a JSON object string"),
+				       v_invalid();
 
-                if (json_parse_object_text(rctx->ctx, s.v.s, &out))
-                        return v_invalid();
+			if (json_parse_object_text(rctx->ctx, s.v.s, &out))
+				return vm_log_builtin_error(rctx, op,
+					       "argument must contain a valid JSON object"),
+				       v_invalid();
 
                 return out;
         }
@@ -2307,33 +2365,37 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
         if (callee.type == MAESTRO_VAL_BUILTIN)
                 op = img_ident_name(rctx->ctx, callee.v.handle->name_id);
 
-        if (!strcmp(op, "+") || !strcmp(op, "-") || !strcmp(op, "*") ||
-            !strcmp(op, "/") || !strcmp(op, "%")) {
-                if (!builtin_numeric(rctx->ctx, op, argv, argc, &out))
-                        goto out;
-        }
+	if (!strcmp(op, "+") || !strcmp(op, "-") || !strcmp(op, "*") ||
+	    !strcmp(op, "/") || !strcmp(op, "%")) {
+		if (!builtin_numeric(rctx->ctx, op, argv, argc, &out))
+			goto out;
 
-        if (!strcmp(op, "=") || !strcmp(op, "!=") || !strcmp(op, "<") ||
-            !strcmp(op, "<=") || !strcmp(op, ">") || !strcmp(op, ">=")) {
-                if (!builtin_cmp(rctx->ctx, op, argv, argc, &out))
-                        goto out;
-        }
+		BUILTIN_FAIL("invalid numeric arguments");
+	}
 
-        if (!strcmp(op, "concat")) {
-                if (argc < 2)
-                        goto out;
+	if (!strcmp(op, "=") || !strcmp(op, "!=") || !strcmp(op, "<") ||
+	    !strcmp(op, "<=") || !strcmp(op, ">") || !strcmp(op, ">=")) {
+		if (!builtin_cmp(rctx->ctx, op, argv, argc, &out))
+			goto out;
+
+		BUILTIN_FAIL("invalid comparison arguments");
+	}
+
+	if (!strcmp(op, "concat")) {
+		if (argc < 2)
+			BUILTIN_FAIL("expected at least two arguments");
 
                 if (argv[0].type == MAESTRO_VAL_STRING) {
                         char *acc = xstrdup(argv[0].v.s);
 
                         for (i = 1; i < argc; i++) {
                                 char *next;
-                                argv[i] = deref_value(argv[i]);
+				argv[i] = deref_value(argv[i]);
 
-                                if (argv[i].type != MAESTRO_VAL_STRING) {
-                                        free(acc);
-                                        goto out;
-                                }
+				if (argv[i].type != MAESTRO_VAL_STRING) {
+					free(acc);
+					BUILTIN_FAIL("string concatenation requires string arguments");
+				}
 
                                 next = fmt_string("%s%s", acc, argv[i].v.s);
                                 free(acc);
@@ -2345,8 +2407,8 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                         goto out;
                 }
 
-                if (argv[0].type == MAESTRO_VAL_LIST) {
-                        out = v_list(rctx->ctx);
+		if (argv[0].type == MAESTRO_VAL_LIST) {
+			out = v_list(rctx->ctx);
 
                         for (i = 0; i < argv[0].v.list->nr; i++)
                                 list_push(rctx->ctx, out.v.list, argv[0].v.list->item[i]);
@@ -2354,14 +2416,19 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                         for (i = 1; i < argc; i++)
                                 list_push(rctx->ctx, out.v.list, deref_value(argv[i]));
 
-                        goto out;
-                }
-        }
+			goto out;
+		}
 
-        if (!strcmp(op, "substr")) {
-                argv[0] = deref_value(argv[0]);
-                argv[1] = deref_value(argv[1]);
-                argv[2] = deref_value(argv[2]);
+		BUILTIN_FAIL("expected either strings or a leading list");
+	}
+
+	if (!strcmp(op, "substr")) {
+		if (argc != 3)
+			BUILTIN_FAIL("expected exactly three arguments");
+
+		argv[0] = deref_value(argv[0]);
+		argv[1] = deref_value(argv[1]);
+		argv[2] = deref_value(argv[2]);
 
                 if (argc == 3 && argv[0].type == MAESTRO_VAL_INT &&
                     argv[1].type == MAESTRO_VAL_INT && argv[2].type == MAESTRO_VAL_STRING) {
@@ -2370,38 +2437,49 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                         size_t n = strlen(argv[2].v.s);
                         char *s;
 
-                        if (l > r || r > n)
-                                goto out;
+			if (l > r || r > n)
+				BUILTIN_FAIL("substring range is out of bounds");
 
-                        s = malloc(r - l + 1);
+			s = malloc(r - l + 1);
 
-                        if (!s)
-                                goto out;
+			if (!s)
+				BUILTIN_FAIL("unable to allocate substring");
 
                         memcpy(s, argv[2].v.s + l, r - l);
                         s[r - l] = 0;
                         out = v_string(rctx->ctx, s);
-                        free(s);
-                        goto out;
-                }
-        }
+			free(s);
+			goto out;
+		}
 
-        if (!strcmp(op, "to-string")) {
-                char *s;
-                argv[0] = deref_value(argv[0]);
+		BUILTIN_FAIL("expected (substr int int string)");
+	}
+
+	if (!strcmp(op, "to-string")) {
+		char *s;
+
+		if (argc != 1)
+			BUILTIN_FAIL("expected exactly one argument");
+
+		argv[0] = deref_value(argv[0]);
 
                 if (argc == 1 &&
                     (argv[0].type == MAESTRO_VAL_INT || argv[0].type == MAESTRO_VAL_FLOAT ||
                      argv[0].type == MAESTRO_VAL_SYMBOL)) {
                         s = maestro_value_stringify(rctx->ctx, argv[0]);
-                        out = v_string(rctx->ctx, s);
-                        free(s);
-                        goto out;
-                }
-        }
+			out = v_string(rctx->ctx, s);
+			free(s);
+			goto out;
+		}
 
-        if (!strcmp(op, "floor") || !strcmp(op, "ceil")) {
-                argv[0] = deref_value(argv[0]);
+		BUILTIN_FAIL("expected an int, float, or symbol");
+	}
+
+	if (!strcmp(op, "floor") || !strcmp(op, "ceil")) {
+		if (argc != 1)
+			BUILTIN_FAIL("expected exactly one argument");
+
+		argv[0] = deref_value(argv[0]);
 
                 if (argc == 1) {
                         if (argv[0].type == MAESTRO_VAL_INT) {
@@ -2409,34 +2487,36 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                                 goto out;
                         }
 
-                        if (argv[0].type == MAESTRO_VAL_FLOAT) {
-                                out = v_int(!strcmp(op, "floor") ?
-                                            (maestro_int_t)floorf(argv[0].v.f) :
-                                            (maestro_int_t)ceilf(argv[0].v.f));
-                                goto out;
-                        }
-                }
-        }
+			if (argv[0].type == MAESTRO_VAL_FLOAT) {
+				out = v_int(!strcmp(op, "floor") ?
+					    (maestro_int_t)floorf(argv[0].v.f) :
+					    (maestro_int_t)ceilf(argv[0].v.f));
+				goto out;
+			}
+		}
 
-        if (!strcmp(op, "log") || !strcmp(op, "print")) {
+		BUILTIN_FAIL("expected an int or float");
+	}
+
+	if (!strcmp(op, "log") || !strcmp(op, "print")) {
                 char *s;
                 int rc;
                 argv[0] = deref_value(argv[0]);
 
-                if (argc != 1 || argv[0].type != MAESTRO_VAL_STRING)
-                        goto out;
+		if (argc != 1 || argv[0].type != MAESTRO_VAL_STRING)
+			BUILTIN_FAIL("expected exactly one string argument");
 
-                s = xstrdup(argv[0].v.s);
+		s = xstrdup(argv[0].v.s);
 
-                if (!s)
-                        goto out;
+		if (!s)
+			BUILTIN_FAIL("unable to allocate output buffer");
 
                 rc = !strcmp(op, "log") ? rctx->ctx->log(rctx->ctx, s) :
                      rctx->ctx->print(rctx->ctx, s);
                 free(s);
-                out = v_int(rc);
-                goto out;
-        }
+		out = v_int(rc);
+		goto out;
+	}
 
         if (!strcmp(op, "empty?") && argc == 1) {
                 bool e = false;
@@ -2539,6 +2619,9 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 goto out;
         }
 
+        if (callee.type == MAESTRO_VAL_BUILTIN)
+                BUILTIN_FAIL("invalid arguments or arity");
+
         {
                 maestro_value fn = callee.type ? callee : eval_ident(rctx, mod, scope, op);
 
@@ -2638,9 +2721,11 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
         }
 
 out:
-        free(argv);
-        return out;
+	free(argv);
+	return out;
 }
+
+#undef BUILTIN_FAIL
 
 static maestro_value eval_node(struct run_ctx *rctx, struct img_mod *mod,
                                struct maestro_scope *scope, uint32_t idx,
@@ -2761,26 +2846,35 @@ int maestro_run(maestro_ctx *ctx, const char *module_path, maestro_value **args,
         size_t i;
         int ret = 0;
 
-        if (!ctx || !result)
-                return MAESTRO_ERR_RUNTIME;
+	if (!ctx || !result)
+		return MAESTRO_ERR_RUNTIME;
 
-        *result = NULL;
-        mod = find_mod(ctx, module_path);
+	*result = NULL;
+	mod = find_mod(ctx, module_path);
 
-        if (!mod)
-                return MAESTRO_ERR_RUNTIME;
+	if (!mod) {
+		vm_log_error(ctx, "module \"%s\" not found",
+			     module_path ? module_path : "");
+		return MAESTRO_ERR_RUNTIME;
+	}
 
-        if (argc) {
-                argv = ctx->alloc(argc * sizeof(*argv));
+	if (argc) {
+		argv = ctx->alloc(argc * sizeof(*argv));
 
-                if (!argv)
-                        return MAESTRO_ERR_NOMEM;
+		if (!argv) {
+			vm_log_error(ctx, "unable to allocate startup arguments for module \"%s\"",
+				     module_path);
+			return MAESTRO_ERR_NOMEM;
+		}
 
-                for (i = 0; i < argc; i++) {
-                        if (!args || !args[i]) {
-                                ret = MAESTRO_ERR_RUNTIME;
-                                goto out;
-                        }
+		for (i = 0; i < argc; i++) {
+			if (!args || !args[i]) {
+				vm_log_error(ctx,
+					     "invalid startup argument list for module \"%s\"",
+					     module_path);
+				ret = MAESTRO_ERR_RUNTIME;
+				goto out;
+			}
 
                         argv[i] = clone_value(ctx, *args[i]);
                 }
@@ -2791,12 +2885,14 @@ int maestro_run(maestro_ctx *ctx, const char *module_path, maestro_value **args,
         rctx.last_state = v_object(ctx);
         obj_set(ctx, rctx.last_state.v.obj, "state",
                 eval_ident(&rctx, mod, NULL, "start"));
-        start = eval_ident(&rctx, mod, NULL, "start");
+	start = eval_ident(&rctx, mod, NULL, "start");
 
-        if (start.type != MAESTRO_VAL_STATE) {
-                ret = MAESTRO_ERR_RUNTIME;
-                goto out;
-        }
+	if (start.type != MAESTRO_VAL_STATE) {
+		vm_log_error(ctx, "module \"%s\" has no runnable start state",
+			     module_path);
+		ret = MAESTRO_ERR_RUNTIME;
+		goto out;
+	}
 
         *result = ctx->alloc(sizeof(**result));
 
@@ -2805,12 +2901,14 @@ int maestro_run(maestro_ctx *ctx, const char *module_path, maestro_value **args,
                 goto out;
         }
 
-        raw = run_state(&rctx, mod, start.v.handle, argv, argc);
+	raw = run_state(&rctx, mod, start.v.handle, argv, argc);
 
-        if (raw.type == MAESTRO_VAL_INVALID) {
-                ret = MAESTRO_ERR_RUNTIME;
-                goto out;
-        }
+	if (raw.type == MAESTRO_VAL_INVALID) {
+		vm_log_error(ctx, "module \"%s\" ended with an invalid runtime value",
+			     module_path);
+		ret = MAESTRO_ERR_RUNTIME;
+		goto out;
+	}
 
         **result = clone_value(ctx, raw);
 

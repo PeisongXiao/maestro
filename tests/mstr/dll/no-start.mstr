@@ -1,0 +1,2 @@
+(module tests dll no-start)
+(define answer 7)

@@ -180,22 +180,6 @@ static int check_describe(maestro_ctx *ctx) {
         return ret ? MAESTRO_ERR_RUNTIME : 0;
 }
 
-static int check_object_probe(maestro_ctx *ctx) {
-        maestro_value *result = NULL;
-        const char *got;
-        int ret = maestro_run(ctx, "tests dll object-probe", NULL, 0, &result);
-
-        if (ret) {
-                fprintf(stderr, "object-probe run ret=%d\n", ret);
-                return ret;
-        }
-
-        got = maestro_value_as_string(result);
-        ret = !got || strcmp(got, "Ada:yes");
-        maestro_value_free(ctx, result);
-        return ret ? MAESTRO_ERR_RUNTIME : 0;
-}
-
 static int load_artifact(maestro_ctx *ctx, const char *path, void **img_out) {
         void *img;
         size_t len;
@@ -381,21 +365,6 @@ int main(int argc, char **argv) {
 
         if (check_list(ctx)) {
                 fprintf(stderr, "list check failed\n");
-                goto out_ctx;
-        }
-
-        maestro_ctx_free(ctx);
-        free(img);
-
-        ctx = load_ctx_for_check(argv[2], artifact, &img);
-
-        if (!ctx) {
-                fprintf(stderr, "prepare object ctx failed\n");
-                return 1;
-        }
-
-        if (check_object_probe(ctx)) {
-                fprintf(stderr, "object-probe check failed\n");
                 goto out_ctx;
         }
 

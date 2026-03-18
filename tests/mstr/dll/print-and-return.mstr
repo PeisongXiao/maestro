@@ -1,0 +1,5 @@
+(module tests dll print-and-return)
+(state (start)
+  (steps
+    (print "hello from maestrovm")
+    (transition end 7)))

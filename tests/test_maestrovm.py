@@ -59,6 +59,11 @@ def main() -> int:
         stdout='42|2.5|hi|sym|{"user":{"name":"Ada"}}',
     )
 
+    expect_ok(
+        [maestrovm, "-f", str(SRC_DIR / "print-and-return.mstr"), "-r", "tests dll print-and-return", ""],
+        stdout="hello from maestrovm7",
+    )
+
     expect_ok([maestroc, "-d", str(SRC_DIR), "-o", artifact])
     expect_ok(
         [maestrovm, "-l", ok_so, "-a", artifact, "-r", "tests dll describe", run_args],
@@ -82,6 +87,18 @@ def main() -> int:
     expect_fail([maestrovm, "-l", missing_so, "-d", str(SRC_DIR)], stderr_contains="load dll")
     expect_fail([maestrovm, "-l", fail_so, "-d", str(SRC_DIR)], stderr_contains="load dll")
     expect_fail([maestrovm, "-l", ok_so, dup_so, "-d", str(SRC_DIR)], stderr_contains="load dll")
+    expect_fail(
+        [maestrovm, "-f", str(SRC_DIR / "no-start.mstr"), "-r", "tests dll no-start", ""],
+        stderr_contains='ERROR: module "tests dll no-start" has no runnable start state',
+    )
+    expect_fail(
+        [maestrovm, "-f", str(SRC_DIR / "no-start.mstr"), "-r", "tests dll no-start", ""],
+        stderr_contains='runtime error: module "tests dll no-start" failed with code 5',
+    )
+    expect_fail(
+        [maestrovm, "-f", str(ROOT / "tests" / "mstr" / "json" / "json-call-invalid.mstr"), "-r", "tests json json-call-invalid", ""],
+        stderr_contains='ERROR: builtin json: argument must be a valid JSON-compatible object',
+    )
 
     if tmp_tree.exists():
         shutil.rmtree(tmp_tree)

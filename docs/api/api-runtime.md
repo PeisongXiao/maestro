@@ -81,6 +81,11 @@ int maestro_ctx_set_vm_logger(maestro_ctx *ctx, maestro_output fn);
 
 Sets the VM-internal logging sink.
 
+Runtime execution failures are reported through this logger as
+`ERROR: ...` messages when the runtime detects them. This includes
+invalid builtin use, invalid JSON snippet evaluation, missing runtime
+entry states, and other execution-time failures.
+
 ### `maestro_ctx_set_allocator`
 
 ```c

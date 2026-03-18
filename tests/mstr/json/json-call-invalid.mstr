@@ -1,0 +1,3 @@
+(module tests json json-call-invalid)
+(state (start)
+  (transition end (json 7)))

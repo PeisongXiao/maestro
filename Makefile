@@ -24,6 +24,15 @@ DLL_FIXTURES := \
 	$(BUILD_DIR)/tests/dll/plugin_fail.so \
 	$(BUILD_DIR)/tests/dll/plugin_missing.so
 DLL_ARTIFACT := $(BUILD_DIR)/tests/dllapi.mstro
+DLL_ARTIFACT_SRCS := \
+	tests/mstr/dll/int.mstr \
+	tests/mstr/dll/float.mstr \
+	tests/mstr/dll/bool.mstr \
+	tests/mstr/dll/string.mstr \
+	tests/mstr/dll/symbol.mstr \
+	tests/mstr/dll/list.mstr \
+	tests/mstr/dll/object-probe.mstr \
+	tests/mstr/dll/describe.mstr
 EXAMPLE_CATS := basics external json modules refs state
 EXAMPLE_ARTIFACTS := $(patsubst %,$(BUILD_DIR)/examples/%.mstro,$(EXAMPLE_CATS))
 
@@ -113,9 +122,9 @@ $(BUILD_DIR)/tests/dll/%.so: tests/dll/%.c include/maestro/maestro.h
 	@mkdir -p $(BUILD_DIR)/tests/dll
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -shared -o $@ $<
 
-$(BUILD_DIR)/tests/dllapi.mstro: $(BUILD_DIR)/maestroc $(wildcard tests/mstr/dll/*.mstr)
+$(BUILD_DIR)/tests/dllapi.mstro: Makefile $(BUILD_DIR)/maestroc $(DLL_ARTIFACT_SRCS)
 	@mkdir -p $(BUILD_DIR)/tests
-	./$(BUILD_DIR)/maestroc -d tests/mstr/dll -o $@
+	./$(BUILD_DIR)/maestroc -f $(DLL_ARTIFACT_SRCS) -o $@
 
 $(BUILD_DIR)/examples/%.mstro: $(BUILD_DIR)/maestroc
 	@mkdir -p $(BUILD_DIR)/examples

@@ -228,12 +228,12 @@ static int serialize_node_into(maestro_ast_node *node, struct strtab *tab,
         case MAESTRO_AST_FORM: {
                 uint32_t base;
 
-                out->type = IMG_NODE_FORM;
-                out->nr = node->child_nr;
-
                 if (node_vec_reserve(nodes, node->child_nr, &base))
                         return -1;
 
+                out = &nodes->v[idx];
+                out->type = IMG_NODE_FORM;
+                out->nr = node->child_nr;
                 out->first = base;
 
                 for (i = 0; i < node->child_nr; i++) {

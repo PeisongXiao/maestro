@@ -106,6 +106,16 @@ When `-r` is present:
 - the requested module is run after validation succeeds
 - the result is printed to `stdout`
 
+## Output and Errors
+
+- Maestro `print` output is routed to `stdout`
+- Maestro `log` output is routed to `stderr`
+- runtime and CLI diagnostics are routed to `stderr`
+- VM runtime failures emit `ERROR: ...` lines through the configured
+  VM logger, including invalid builtin use and invalid JSON snippet
+  evaluation
+- runtime failure prints an error message to `stderr` and exits non-zero
+
 ## Static Argument Grammar
 
 The `ARGS` string accepted by `-r` supports only static literal
