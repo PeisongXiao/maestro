@@ -1,0 +1,6 @@
+(module 'tests 'objects 'missing-ref)
+(state (start)
+  (steps
+    (let foo empty-object)
+    (let missing 'missing)
+    (transition end (ref foo missing))))

@@ -1,4 +1,4 @@
-(module tests bundles proc)
+(module 'tests 'bundles 'proc)
 (state (start name msg)
   (steps
     (transition end (json {"name":name,"msg":msg}))))

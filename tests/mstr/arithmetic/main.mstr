@@ -1,4 +1,4 @@
-(module tests arithmetic main)
+(module 'tests 'arithmetic 'main)
 (state (start)
   (steps
     (transition end

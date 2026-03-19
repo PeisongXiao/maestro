@@ -1,7 +1,7 @@
-(module app last)
+(module 'app 'last)
 (state (start)
   (steps
     (transition next "alpha")))
 (state (next)
   (steps
-    (transition end (get last-state val))))
+    (transition end (get last-state 'val))))

@@ -1,5 +1,5 @@
-(module tests bundles alpha)
-(define proc (import-program tests bundles proc))
+(module 'tests 'bundles 'alpha)
+(define proc (import-program 'tests 'bundles 'proc))
 (state (start)
   (steps
     (transition end (run proc (list "alpha" "host")))))

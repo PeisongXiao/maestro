@@ -7,6 +7,18 @@ static const char *node_ident(maestro_ast_node *n) {
         return n->text;
 }
 
+static const char *node_atom(maestro_ast_node *n) {
+        if (!n ||
+            (n->type != MAESTRO_AST_IDENT && n->type != MAESTRO_AST_SYMBOL))
+                return NULL;
+
+        return n->text;
+}
+
+static bool path_seg_ok(maestro_ast_node *n) {
+        return node_atom(n) != NULL;
+}
+
 static char *join_node_path(maestro_ast_node *form, uint32_t start,
                             uint32_t end) {
         char *buf;
@@ -17,10 +29,10 @@ static char *join_node_path(maestro_ast_node *form, uint32_t start,
                 return NULL;
 
         for (i = start; i < end; i++) {
-                if (!form->child[i]->text)
+                if (!path_seg_ok(form->child[i]))
                         return NULL;
 
-                len += strlen(form->child[i]->text) + (i + 1 < end ? 1U : 0U);
+                len += strlen(node_atom(form->child[i])) + (i + 1 < end ? 1U : 0U);
         }
 
         buf = malloc(len + 1);
@@ -31,7 +43,7 @@ static char *join_node_path(maestro_ast_node *form, uint32_t start,
         buf[0] = 0;
 
         for (i = start; i < end; i++) {
-                strcat(buf, form->child[i]->text);
+                strcat(buf, node_atom(form->child[i]));
 
                 if (i + 1 < end)
                         strcat(buf, " ");
@@ -48,12 +60,227 @@ static int ast_path_eq(maestro_ast *ast, maestro_ast_node *form, uint32_t start,
                 return 0;
 
         for (i = start; i < end; i++) {
-                if (!form->child[i]->text || strcmp(ast->module_seg[i - start],
-                                                    form->child[i]->text))
+                if (!path_seg_ok(form->child[i]) ||
+                    strcmp(ast->module_seg[i - start], node_atom(form->child[i])))
                         return 0;
         }
 
         return 1;
+}
+
+static maestro_ast *find_ast(maestro_asts *asts, maestro_ast_node *form,
+                             uint32_t start, uint32_t end);
+
+enum ast_binding_kind {
+        AST_BIND_NONE = 0,
+        AST_BIND_VALUE,
+        AST_BIND_MACRO,
+        AST_BIND_STATE,
+        AST_BIND_EXTERNAL,
+        AST_BIND_PROGRAM,
+};
+
+struct ast_resolve_frame {
+        maestro_ast *ast;
+        const char *name;
+        struct ast_resolve_frame *up;
+};
+
+static bool ast_resolving(struct ast_resolve_frame *frame, maestro_ast *ast,
+                          const char *name) {
+        for (; frame; frame = frame->up) {
+                if (frame->ast == ast && !strcmp(frame->name, name))
+                        return true;
+        }
+
+        return false;
+}
+
+static enum ast_binding_kind resolve_binding_kind(maestro_asts *asts,
+                                                  maestro_ast *ast,
+                                                  const char *name,
+                                                  struct ast_resolve_frame *frame);
+
+static enum ast_binding_kind resolve_import_kind(maestro_asts *asts,
+                                                 maestro_ast *ast_unused,
+                                                 maestro_ast_node *form,
+                                                 const char *name,
+                                                 struct ast_resolve_frame *frame) {
+        maestro_ast *target;
+        const char *import_name;
+
+        if (!form || form->child_nr < 3 || !name)
+                return AST_BIND_NONE;
+
+        (void)ast_unused;
+        target = find_ast(asts, form, 1, form->child_nr - 1);
+        import_name = node_atom(form->child[form->child_nr - 1]);
+
+        if (!target || !import_name)
+                return AST_BIND_NONE;
+
+        if (!strcmp(import_name, "*"))
+                return resolve_binding_kind(asts, target, name, frame);
+
+        if (!strcmp(import_name, name))
+                return resolve_binding_kind(asts, target, import_name, frame);
+
+        return AST_BIND_NONE;
+}
+
+static enum ast_binding_kind resolve_body_kind(maestro_asts *asts,
+                                               maestro_ast *ast,
+                                               maestro_ast_node *body,
+                                               struct ast_resolve_frame *frame) {
+        maestro_ast_node *head;
+
+        if (!body)
+                return AST_BIND_NONE;
+
+        if (body->type == MAESTRO_AST_IDENT)
+                return resolve_binding_kind(asts, ast, body->text, frame);
+
+        if (body->type != MAESTRO_AST_FORM || body->child_nr < 1)
+                return AST_BIND_VALUE;
+
+        head = body->child[0];
+
+        if (!node_ident(head))
+                return AST_BIND_VALUE;
+
+        if (!strcmp(node_ident(head), "import") && body->child_nr >= 3) {
+                maestro_ast *target = find_ast(asts, body, 1, body->child_nr - 1);
+                const char *name = node_atom(body->child[body->child_nr - 1]);
+
+                if (!target || !name || !strcmp(name, "*"))
+                        return AST_BIND_NONE;
+
+                return resolve_binding_kind(asts, target, name, frame);
+        }
+
+        if (!strcmp(node_ident(head), "import-program"))
+                return AST_BIND_PROGRAM;
+
+        return AST_BIND_VALUE;
+}
+
+static enum ast_binding_kind resolve_binding_kind(maestro_asts *asts,
+                                                  maestro_ast *ast,
+                                                  const char *name,
+                                                  struct ast_resolve_frame *frame) {
+        struct ast_resolve_frame next = {0};
+        uint32_t i;
+
+        if (!asts || !ast || !name)
+                return AST_BIND_NONE;
+
+        if (ast_resolving(frame, ast, name))
+                return AST_BIND_NONE;
+
+        next.ast = ast;
+        next.name = name;
+        next.up = frame;
+
+        for (i = 0; i < ast->root->child_nr; i++) {
+                maestro_ast_node *f = ast->root->child[i];
+                maestro_ast_node *head;
+
+                if (f->type != MAESTRO_AST_FORM || f->child_nr < 1)
+                        continue;
+
+                head = f->child[0];
+
+                if (!node_ident(head))
+                        continue;
+
+                if (!strcmp(node_ident(head), "define") && f->child_nr >= 3) {
+                        maestro_ast_node *sig = f->child[1];
+                        maestro_ast_node *body = f->child[2];
+
+                        if (sig->type == MAESTRO_AST_IDENT &&
+                            !strcmp(sig->text, name))
+                                return resolve_body_kind(asts, ast, body, &next);
+
+                        if (sig->type == MAESTRO_AST_FORM && sig->child_nr >= 1 &&
+                            node_ident(sig->child[0]) &&
+                            !strcmp(sig->child[0]->text, name))
+                                return body->type == MAESTRO_AST_IDENT &&
+                                               !strcmp(body->text, "external") ?
+                                               AST_BIND_EXTERNAL :
+                                               AST_BIND_MACRO;
+                }
+
+                if (!strcmp(node_ident(head), "state") && f->child_nr >= 3) {
+                        maestro_ast_node *sig = f->child[1];
+
+                        if (sig->type == MAESTRO_AST_FORM && sig->child_nr >= 1 &&
+                            node_ident(sig->child[0]) &&
+                            !strcmp(sig->child[0]->text, name))
+                                return AST_BIND_STATE;
+                }
+
+                if (!strcmp(node_ident(head), "import")) {
+                        enum ast_binding_kind kind =
+                                resolve_import_kind(asts, ast, f, name, &next);
+
+                        if (kind != AST_BIND_NONE)
+                                return kind;
+                }
+        }
+
+        return AST_BIND_NONE;
+}
+
+static int validate_higher_order(FILE *err, maestro_asts *asts,
+                                 maestro_ast *ast, maestro_ast_node *node) {
+        static const char *const ops[] = {
+                "map", "filter", "foldl", "foldr", "any?", "all?"
+        };
+        uint32_t i;
+
+        if (!node)
+                return 0;
+
+        if (node->type == MAESTRO_AST_FORM && node->child_nr >= 1 &&
+            node_ident(node->child[0])) {
+                const char *op = node_ident(node->child[0]);
+
+                for (i = 0; i < sizeof(ops) / sizeof(ops[0]); i++) {
+                        if (!strcmp(op, ops[i])) {
+                                maestro_ast_node *cb = node->child_nr > 1 ?
+                                                       node->child[1] : NULL;
+                                enum ast_binding_kind kind;
+
+                                if (!cb || cb->type != MAESTRO_AST_IDENT) {
+                                        diagf(err, "%s callback must be a bound identifier\n",
+                                              op);
+                                        return -1;
+                                }
+
+                                kind = resolve_binding_kind(asts, ast, cb->text, NULL);
+
+                                if (kind != AST_BIND_MACRO &&
+                                    kind != AST_BIND_EXTERNAL) {
+                                        diagf(err,
+                                              "%s callback %s must resolve to a source macro or external binding\n",
+                                              op, cb->text);
+                                        return -1;
+                                }
+                        }
+                }
+        }
+
+        for (i = 0; i < node->child_nr; i++) {
+                if (validate_higher_order(err, asts, ast, node->child[i]))
+                        return -1;
+        }
+
+        for (i = 0; i < node->kv_nr; i++) {
+                if (validate_higher_order(err, asts, ast, node->kv[i].value))
+                        return -1;
+        }
+
+        return 0;
 }
 
 static maestro_ast *find_ast(maestro_asts *asts, maestro_ast_node *form,
@@ -132,10 +359,10 @@ static int validate_imports(FILE *err, maestro_asts *asts,
 
                 if (!strcmp(op, "import") && node->child_nr >= 3) {
                         char *mod = join_node_path(node, 1, node->child_nr - 1);
-                        const char *name = node->child[node->child_nr - 1]->text;
+                        const char *name = node_atom(node->child[node->child_nr - 1]);
                         maestro_ast *ast = find_ast(asts, node, 1, node->child_nr - 1);
 
-                        if (!ast) {
+                        if (!name || !ast) {
                                 diagf(err, "missing import module %s\n", mod);
                                 free(mod);
                                 return -1;
@@ -358,6 +585,9 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic,
                 uint32_t i;
 
                 if (validate_imports(stderr, src, ast->root))
+                        return MAESTRO_ERR_LINK;
+
+                if (validate_higher_order(stderr, src, ast, ast->root))
                         return MAESTRO_ERR_LINK;
 
                 mod.path_first = (uint32_t)paths.nr;

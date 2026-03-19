@@ -1,5 +1,5 @@
-(module app caller)
-(define worker (import-program app worker))
+(module 'app 'caller)
+(define worker (import-program 'app 'worker))
 (state (start)
   (steps
     (let msg (run worker (list "Ada")))

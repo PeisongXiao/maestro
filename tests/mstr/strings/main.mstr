@@ -1,4 +1,4 @@
-(module tests strings main)
+(module 'tests 'strings 'main)
 (state (start)
   (steps
     (transition end (concat (substr 0 3 "abcdef") "-" (to-string (floor 3.8))))))

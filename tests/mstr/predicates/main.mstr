@@ -1,10 +1,10 @@
-(module tests predicates main)
+(module 'tests 'predicates 'main)
 (define (helper x) x)
 (state (start)
   (steps
     (let bag empty-object)
-    (set bag n 1)
-    (let r (ref bag n))
+    (set bag 'n 1)
+    (let r (ref bag 'n))
     (transition end
       (list
         (empty? empty-string)

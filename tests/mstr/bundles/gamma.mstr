@@ -1,4 +1,4 @@
-(module tests bundles gamma)
+(module 'tests 'bundles 'gamma)
 (define (host-object) external)
 (state (start)
   (steps

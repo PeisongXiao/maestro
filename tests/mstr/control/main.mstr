@@ -1,4 +1,4 @@
-(module tests control main)
+(module 'tests 'control 'main)
 (state (start)
   (steps
     (let x 2)

@@ -1,4 +1,4 @@
-(module tests json serialize)
+(module 'tests 'json 'serialize)
 (state (start)
   (steps
     (let age 37)

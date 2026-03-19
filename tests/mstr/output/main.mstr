@@ -1,4 +1,4 @@
-(module tests output main)
+(module 'tests 'output 'main)
 (state (start)
   (steps
     (print "out!")

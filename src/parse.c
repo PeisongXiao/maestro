@@ -360,6 +360,16 @@ static maestro_ast_node *parse_expr(struct text *t, FILE *err) {
         if (c == '{')
                 return parse_json(t, err);
 
+        if (c == EOF) {
+                diagf(err, "unexpected end of input\n");
+                return NULL;
+        }
+
+        if (c == ')' || c == '}' || c == ':' || c == ',') {
+                diagf(err, "unexpected '%c'\n", c);
+                return NULL;
+        }
+
         if (c == '"') {
                 char *s = parse_string_raw(t, err);
 
@@ -379,6 +389,12 @@ static maestro_ast_node *parse_expr(struct text *t, FILE *err) {
 
         if (c == '\'') {
                 txt_get(t);
+
+                if (is_delim(txt_peek(t))) {
+                        diagf(err, "expected symbol after quote\n");
+                        return NULL;
+                }
+
                 tok = parse_token(t);
 
                 if (!tok)
@@ -578,7 +594,8 @@ static int extract_module_path(maestro_ast_node *root, FILE *err,
                         }
 
                         for (j = 1; j < f->child_nr; j++) {
-                                if (f->child[j]->type != MAESTRO_AST_IDENT ||
+                                if ((f->child[j]->type != MAESTRO_AST_IDENT &&
+                                     f->child[j]->type != MAESTRO_AST_SYMBOL) ||
                                     !is_valid_identifier(f->child[j]->text)) {
                                         diagf(err, "invalid module path segment\n");
                                         return -1;

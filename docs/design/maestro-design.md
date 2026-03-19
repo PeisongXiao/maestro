@@ -56,7 +56,9 @@ size_t maestro_list_externals(maestro_ctx *ctx, const char ***names);
 ```
 
 `module_path` is supplied as space-separated text at the public API
-boundary, matching Maestro source path shape.
+boundary. In Maestro source itself, path segments are written as
+symbol literals; the public API keeps the host-facing space-separated
+string form.
 
 Parser diagnostics are written directly to `FILE *err`. Directory
 walking is not part of the parser library;

@@ -86,10 +86,45 @@ SHALLOW_CASES = {
             "error": True,
         },
     ],
+    "higherorder": [
+        {
+            "module": "tests higherorder main",
+            "result": "[[2,3,4],[2,4],10,123,true,true,[true,true,true]]",
+        },
+        {
+            "module": "tests higherorder external",
+            "result": "[[2,3,4],[2,4],true]",
+            "externals": ["host-even", "host-inc"],
+        },
+    ],
     "objects": [
         {
             "module": "tests objects main",
-            "result": "1",
+            "result": "[Ada,38]",
+        },
+        {
+            "module": "tests objects missing-get",
+            "result": "[true,true,true,true]",
+        },
+        {
+            "module": "tests objects missing-ref",
+            "error": True,
+        },
+        {
+            "module": "tests objects wrong-type",
+            "error": True,
+        },
+        {
+            "module": "tests objects expr-root",
+            "result": "Ada",
+        },
+        {
+            "module": "tests objects probe",
+            "result": "[true,false,true,true]",
+        },
+        {
+            "module": "tests objects invalid-get",
+            "error": True,
         },
     ],
     "json": [

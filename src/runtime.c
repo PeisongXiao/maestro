@@ -288,6 +288,18 @@ static maestro_value v_symbol_borrow(maestro_ctx *ctx, const char *s) {
         return v;
 }
 
+static maestro_value v_symbol(maestro_ctx *ctx, const char *s) {
+        maestro_value v = v_invalid();
+
+        v.type = MAESTRO_VAL_SYMBOL;
+        v.v.s = ctx->alloc(strlen(s) + 1);
+
+        if (v.v.s)
+                strcpy(v.v.s, s);
+
+        return v;
+}
+
 static maestro_value v_list(maestro_ctx *ctx) {
         maestro_value v = v_invalid();
 
@@ -1381,6 +1393,7 @@ static bool is_builtin_name(const char *name) {
                 "and", "or", "not", "+", "-", "*", "/", "%",
                 "=", "!=", "<", "<=", ">", ">=", "ref=?",
                 "concat", "append", "substr", "to-string", "floor", "ceil",
+                "map", "filter", "foldl", "foldr", "any?", "all?", "probe",
                 "log", "print", "empty?", "true?", "false?",
                 "number?", "integer?", "float?", "string?", "list?",
                 "object?", "symbol?", "boolean?", "ref?", "state?",
@@ -1433,7 +1446,8 @@ static int mod_path_eq_form(struct run_ctx *rctx, struct img_mod *mod,
         for (i = start; i < end; i++) {
                 struct img_node *seg = img_node(rctx->ctx, form->first + i);
 
-                if (seg->type != IMG_NODE_IDENT && seg->type != IMG_NODE_STRING)
+                if (seg->type != IMG_NODE_IDENT && seg->type != IMG_NODE_STRING &&
+                    seg->type != IMG_NODE_SYMBOL)
                         return 0;
 
                 if (strcmp(node_text(rctx->ctx, seg),
@@ -1523,6 +1537,11 @@ static bool resolving(struct resolve_frame *frame, uint32_t mod_idx,
 
 static maestro_value resolve_global(struct run_ctx *rctx, struct img_mod *mod,
                                     const char *name, struct resolve_frame *frame);
+
+static maestro_value invoke_callback_binding(struct run_ctx *rctx,
+                                             maestro_value fn,
+                                             maestro_value *argv,
+                                             size_t argc);
 
 static maestro_value resolve_import(struct run_ctx *rctx,
                                     struct img_mod *mod_unused,
@@ -1726,6 +1745,76 @@ static int lookup_object_path(maestro_value *root, char **path, size_t nr,
         return 0;
 }
 
+enum path_eval_result {
+        PATH_EVAL_OK = 0,
+        PATH_EVAL_INVALID_SEG = -1,
+        PATH_EVAL_ABORT = -2,
+        PATH_EVAL_OOM = -3,
+};
+
+static void free_owned_path(maestro_ctx *ctx, char **path, size_t nr) {
+        if (!ctx || !path)
+                return;
+
+        while (nr) {
+                nr--;
+                if (path[nr])
+                        ctx->dealloc(path[nr]);
+        }
+
+        ctx->dealloc(path);
+}
+
+static enum path_eval_result eval_symbol_path(struct run_ctx *rctx,
+                                              struct img_mod *mod,
+                                              struct maestro_scope *scope,
+                                              const char *op, uint32_t first,
+                                              size_t nr, struct eval_res *eres,
+                                              char ***path_out) {
+        char **path;
+        size_t i;
+
+        *path_out = NULL;
+        path = rctx->ctx->alloc(nr * sizeof(*path));
+
+        if (!path)
+                return PATH_EVAL_OOM;
+
+        memset(path, 0, nr * sizeof(*path));
+
+        for (i = 0; i < nr; i++) {
+                struct eval_res inner = {0};
+                maestro_value seg = eval_node(rctx, mod, scope, first + i, &inner);
+                const char *sym = maestro_value_as_symbol(&seg);
+
+                if (eval_failed(&inner, seg) || inner.ctrl != CTRL_OK) {
+                        if (eres)
+                                *eres = inner;
+                        free_owned_path(rctx->ctx, path, nr);
+                        return PATH_EVAL_ABORT;
+                }
+
+                if (!sym) {
+                        free_owned_path(rctx->ctx, path, nr);
+                        vm_log_builtin_error(rctx, op,
+                                             "path segments must evaluate to symbols");
+                        return PATH_EVAL_INVALID_SEG;
+                }
+
+                path[i] = rctx->ctx->alloc(strlen(sym) + 1);
+
+                if (!path[i]) {
+                        free_owned_path(rctx->ctx, path, nr);
+                        return PATH_EVAL_OOM;
+                }
+
+                strcpy(path[i], sym);
+        }
+
+        *path_out = path;
+        return PATH_EVAL_OK;
+}
+
 static maestro_value ref_read(struct maestro_ref *ref) {
         maestro_value *slot;
 
@@ -1795,6 +1884,98 @@ static maestro_value eval_json(struct run_ctx *rctx, struct img_mod *mod,
         }
 
         return obj;
+}
+
+static maestro_value invoke_callback_binding(struct run_ctx *rctx,
+                                             maestro_value fn,
+                                             maestro_value *argv,
+                                             size_t argc) {
+        struct maestro_handle *h;
+        struct img_mod *call_mod;
+        struct module_scope *ms;
+        struct maestro_scope *call = NULL;
+        struct img_node *body;
+        struct eval_res inner = {0};
+        maestro_value out = v_invalid();
+        size_t i;
+
+        if (!rctx || fn.type != MAESTRO_VAL_MACRO || !fn.v.handle)
+                return v_invalid();
+
+        h = fn.v.handle;
+        call_mod = img_mod_by_idx(rctx->ctx, h->module_idx);
+
+        if (!call_mod || h->argc != argc)
+                return v_invalid();
+
+        for (i = 0; i < argc; i++) {
+                if (h->arg_ref && h->arg_ref[i]) {
+                        vm_log_error(rctx->ctx,
+                                     "higher-order callback \"%s\" may not use ref parameters",
+                                     img_ident_name(rctx->ctx, h->name_id));
+                        return v_invalid();
+                }
+        }
+
+        body = img_node(rctx->ctx, h->body_idx);
+
+        if (body->type == IMG_NODE_IDENT &&
+            !strcmp(node_ident_name(rctx->ctx, body), "external")) {
+                maestro_value **argp = NULL;
+                maestro_value *ext_result = NULL;
+                const char *fn_name = img_ident_name(rctx->ctx, h->name_id);
+                int rc = MAESTRO_ERR_RUNTIME;
+
+                if (argc) {
+                        argp = rctx->ctx->alloc(argc * sizeof(*argp));
+
+                        if (!argp)
+                                return v_invalid();
+                }
+
+                for (i = 0; i < argc; i++)
+                        argp[i] = &argv[i];
+
+                for (i = 0; i < rctx->ctx->fn_nr; i++) {
+                        if (!strcmp(rctx->ctx->fns[i].name, fn_name)) {
+                                rc = rctx->ctx->fns[i].fn(rctx->ctx, argp, argc,
+                                                          &ext_result);
+                                break;
+                        }
+                }
+
+                if (argp)
+                        rctx->ctx->dealloc(argp);
+
+                if (rc || !ext_result)
+                        return v_invalid();
+
+                out = clone_value(rctx->ctx, *ext_result);
+                maestro_value_free(rctx->ctx, ext_result);
+                return out;
+        }
+
+        ms = module_scope_get(rctx, call_mod);
+
+        if (!ms)
+                return v_invalid();
+
+        call = scope_new(rctx->ctx, ms->globals);
+
+        if (!call)
+                return v_invalid();
+
+        for (i = 0; i < argc; i++) {
+                if (scope_set(rctx->ctx, call, h->argv_id[i], deref_value(argv[i])))
+                        return v_invalid();
+        }
+
+        out = eval_node(rctx, call_mod, call, h->body_idx, &inner);
+
+        if (inner.ctrl != CTRL_OK)
+                return v_invalid();
+
+        return out;
 }
 
 static int builtin_cmp(maestro_ctx *ctx, const char *op, maestro_value *argv,
@@ -1977,35 +2158,39 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                         }
 
                         root = b->value.type ? b->value : v_object(rctx->ctx);
-                        path = calloc(pn, sizeof(*path));
-
-                        if (!path)
+                        switch (eval_symbol_path(rctx, mod, scope, op,
+                                                 node->first + 2, pn, eres, &path)) {
+                        case PATH_EVAL_OK:
+                                break;
+                        case PATH_EVAL_ABORT:
+                                return eres->v;
+                        case PATH_EVAL_INVALID_SEG:
+                                return runtime_error_value(eres);
+                        case PATH_EVAL_OOM:
+                        default:
                                 return v_invalid();
-
-                        for (i = 0; i < pn; i++)
-                                path[i] = (char *)node_text(rctx->ctx,
-                                                            img_node(rctx->ctx, node->first + 2 + i));
+                        }
 
                         if (ensure_object_path(rctx->ctx, &root, path, pn - 1, &slot)) {
-                                free(path);
+                                free_owned_path(rctx->ctx, path, pn);
                                 return v_invalid();
                         }
 
                         out = eval_node(rctx, mod, scope, node->first + node->nr - 1, eres);
 
                         if (eval_failed(eres, out) || eres->ctrl != CTRL_OK) {
-                                free(path);
+                                free_owned_path(rctx->ctx, path, pn);
                                 return out;
                         }
 
                         if (slot->type != MAESTRO_VAL_OBJECT) {
-                                free(path);
+                                free_owned_path(rctx->ctx, path, pn);
                                 return runtime_error_value(eres);
                         }
 
                         obj_set(rctx->ctx, slot->v.obj, path[pn - 1], out);
                         b->value = root;
-                        free(path);
+                        free_owned_path(rctx->ctx, path, pn);
                         return out;
                 }
         }
@@ -2044,68 +2229,95 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                         char **path;
                         size_t pn = node->nr - 3;
 
-                        path = calloc(pn, sizeof(*path));
-
-                        if (!path)
+                        switch (eval_symbol_path(rctx, mod, scope, op,
+                                                 node->first + 2, pn, eres, &path)) {
+                        case PATH_EVAL_OK:
+                                break;
+                        case PATH_EVAL_ABORT:
+                                return eres->v;
+                        case PATH_EVAL_INVALID_SEG:
                                 return runtime_error_value(eres);
-
-                        for (i = 0; i < pn; i++)
-                                path[i] = (char *)node_text(rctx->ctx,
-                                                            img_node(rctx->ctx, node->first + 2 + i));
+                        case PATH_EVAL_OOM:
+                        default:
+                                return runtime_error_value(eres);
+                        }
 
                         if (ensure_object_path(rctx->ctx, &root, path, pn - 1, &slot)) {
-                                free(path);
+                                free_owned_path(rctx->ctx, path, pn);
                                 return runtime_error_value(eres);
                         }
 
                         if (slot->type != MAESTRO_VAL_OBJECT) {
-                                free(path);
+                                free_owned_path(rctx->ctx, path, pn);
                                 return runtime_error_value(eres);
                         }
 
                         out = eval_node(rctx, mod, scope, node->first + node->nr - 1, eres);
 
                         if (eval_failed(eres, out) || eres->ctrl != CTRL_OK) {
-                                free(path);
+                                free_owned_path(rctx->ctx, path, pn);
                                 return out;
                         }
 
                         obj_set(rctx->ctx, slot->v.obj, path[pn - 1], out);
                         b->value = root;
-                        free(path);
+                        free_owned_path(rctx->ctx, path, pn);
                         return out;
                 }
         }
 
-        if (!strcmp(op, "get")) {
-                struct maestro_binding *b;
+	if (!strcmp(op, "get")) {
                 maestro_value cur;
+                char **path = NULL;
+                size_t pn = node->nr - 2;
+                bool bad_mid = false;
 
 		if (node->nr < 3)
 			return vm_log_builtin_error(rctx, op, "expected object and at least one path segment"), v_invalid();
 
-                b = scope_find(scope, img_node(rctx->ctx, node->first + 1)->str_off);
-
-                if (b)
-                        cur = b->value;
-                else
-                        cur = eval_ident(rctx, mod, scope,
-                                         node_ident_name(rctx->ctx,
-                                                         img_node(rctx->ctx, node->first + 1)));
+                cur = eval_node(rctx, mod, scope, node->first + 1, eres);
 
 		if (!cur.type)
 			return vm_log_builtin_error(rctx, op, "object root is invalid"), v_invalid();
 
-		for (i = 2; i < node->nr; i++) {
-			if (cur.type != MAESTRO_VAL_OBJECT)
-				return vm_log_builtin_error(rctx, op, "path traversal requires objects at every segment"), v_invalid();
+                if (eval_failed(eres, cur) || eres->ctrl != CTRL_OK)
+                        return cur;
 
-                        cur = obj_get(cur.v.obj,
-                                      node_text(rctx->ctx, img_node(rctx->ctx, node->first + i)));
+                cur = deref_value(cur);
+
+                switch (eval_symbol_path(rctx, mod, scope, op, node->first + 2,
+                                         pn, eres, &path)) {
+                case PATH_EVAL_OK:
+                        break;
+                case PATH_EVAL_ABORT:
+                        return eres->v;
+                case PATH_EVAL_INVALID_SEG:
+                        return runtime_error_value(eres);
+                case PATH_EVAL_OOM:
+                default:
+                        return runtime_error_value(eres);
+                }
+
+		for (i = 0; i < pn; i++) {
+			if (cur.type != MAESTRO_VAL_OBJECT) {
+                                bad_mid = true;
+                                break;
+                        }
+
+                        cur = obj_get(cur.v.obj, path[i]);
 
 			if (!cur.type)
-				return vm_log_builtin_error(rctx, op, "object path segment not found"), v_invalid();
+                                break;
 		}
+
+                free_owned_path(rctx->ctx, path, pn);
+
+                if (!cur.type)
+                        return v_object(rctx->ctx);
+
+                if (bad_mid)
+                        return vm_log_builtin_error(rctx, op,
+                                                    "path traversal requires objects at every segment"), v_invalid();
 
                 return cur;
         }
@@ -2119,7 +2331,7 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 b = scope_find(scope, img_node(rctx->ctx, node->first + 1)->str_off);
 
                 if (!b)
-                        return v_invalid();
+			return vm_log_builtin_error(rctx, op, "reference root binding not found"), v_invalid();
 
                 ref = rctx->ctx->alloc(sizeof(*ref));
 
@@ -2135,20 +2347,26 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 }
 
                 pn = node->nr - 2;
-                path = rctx->ctx->alloc(pn * sizeof(*path));
-
-                if (!path)
+                switch (eval_symbol_path(rctx, mod, scope, op, node->first + 2,
+                                         pn, eres, &path)) {
+                case PATH_EVAL_OK:
+                        break;
+                case PATH_EVAL_ABORT:
+                        return eres->v;
+                case PATH_EVAL_INVALID_SEG:
+                        return runtime_error_value(eres);
+                case PATH_EVAL_OOM:
+                default:
                         return v_invalid();
-
-                for (i = 0; i < pn; i++)
-                        path[i] = (char *)node_text(rctx->ctx,
-                                                    img_node(rctx->ctx, node->first + 2 + i));
+                }
 
                 {
                         maestro_value *slot = &b->value;
 
-                        if (lookup_object_path(slot, path, pn, &slot))
-                                return v_invalid();
+                        if (lookup_object_path(slot, path, pn, &slot)) {
+                                free_owned_path(rctx->ctx, path, pn);
+				return vm_log_builtin_error(rctx, op, "object path segment not found"), v_invalid();
+                        }
                 }
                 ref->kind = REF_PATH;
                 ref->binding = b;
@@ -2531,6 +2749,145 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 		for (i = 1; i < argc; i++)
 			list_push(rctx->ctx, out.v.list, deref_value(argv[i]));
 
+		goto out;
+	}
+
+	if (!strcmp(op, "probe")) {
+		if (argc != 1)
+			BUILTIN_FAIL("expected exactly one object argument");
+
+		argv[0] = deref_value(argv[0]);
+
+		if (argv[0].type != MAESTRO_VAL_OBJECT) {
+			out = v_list(rctx->ctx);
+			goto out;
+		}
+
+		out = v_list(rctx->ctx);
+
+		for (i = 0; i < argv[0].v.obj->nr; i++)
+			list_push(rctx->ctx, out.v.list,
+				  v_symbol(rctx->ctx, argv[0].v.obj->key[i]));
+
+		goto out;
+	}
+
+	if (!strcmp(op, "map") || !strcmp(op, "filter") ||
+	    !strcmp(op, "any?") || !strcmp(op, "all?")) {
+		maestro_value fnv;
+		maestro_value listv;
+		bool accum = !strcmp(op, "all?");
+
+		if (argc != 2)
+			BUILTIN_FAIL("expected exactly two arguments");
+
+		fnv = argv[0];
+		listv = deref_value(argv[1]);
+
+		if (fnv.type != MAESTRO_VAL_MACRO)
+			BUILTIN_FAIL("callback must be bound to a source macro or external binding");
+
+		if (listv.type != MAESTRO_VAL_LIST)
+			BUILTIN_FAIL("expected a list argument");
+
+		if (!strcmp(op, "map") || !strcmp(op, "filter"))
+			out = v_list(rctx->ctx);
+
+		for (i = 0; i < listv.v.list->nr; i++) {
+			maestro_value cb_argv[1];
+			maestro_value item = listv.v.list->item[i];
+			maestro_value cb_out;
+
+			cb_argv[0] = item;
+			cb_out = invoke_callback_binding(rctx, fnv, cb_argv, 1);
+
+			if (cb_out.type == MAESTRO_VAL_INVALID)
+				BUILTIN_FAIL("callback failed");
+
+			if (!strcmp(op, "map")) {
+				list_push(rctx->ctx, out.v.list, cb_out);
+				continue;
+			}
+
+			if (!strcmp(op, "filter")) {
+				if (value_truthy(cb_out))
+					list_push(rctx->ctx, out.v.list, item);
+				continue;
+			}
+
+			if (!strcmp(op, "any?")) {
+				if (value_truthy(cb_out)) {
+					out = v_bool(true);
+					goto out;
+				}
+				continue;
+			}
+
+			accum = accum && value_truthy(cb_out);
+
+			if (!accum)
+				break;
+		}
+
+		if (!strcmp(op, "any?")) {
+			out = v_bool(false);
+			goto out;
+		}
+
+		if (!strcmp(op, "all?")) {
+			out = v_bool(accum);
+			goto out;
+		}
+
+		goto out;
+	}
+
+	if (!strcmp(op, "foldl") || !strcmp(op, "foldr")) {
+		maestro_value fnv;
+		maestro_value initv;
+		maestro_value listv;
+		maestro_value acc;
+
+		if (argc != 3)
+			BUILTIN_FAIL("expected exactly three arguments");
+
+		fnv = argv[0];
+		initv = deref_value(argv[1]);
+		listv = deref_value(argv[2]);
+
+		if (fnv.type != MAESTRO_VAL_MACRO)
+			BUILTIN_FAIL("callback must be bound to a source macro or external binding");
+
+		if (listv.type != MAESTRO_VAL_LIST)
+			BUILTIN_FAIL("expected a list argument");
+
+		acc = initv;
+
+		if (!strcmp(op, "foldl")) {
+			for (i = 0; i < listv.v.list->nr; i++) {
+				maestro_value cb_argv[2];
+
+				cb_argv[0] = acc;
+				cb_argv[1] = listv.v.list->item[i];
+				acc = invoke_callback_binding(rctx, fnv, cb_argv, 2);
+
+				if (acc.type == MAESTRO_VAL_INVALID)
+					BUILTIN_FAIL("callback failed");
+			}
+		} else {
+			for (i = listv.v.list->nr; i > 0; i--) {
+				maestro_value cb_argv[2];
+
+				cb_argv[0] = listv.v.list->item[i - 1];
+				cb_argv[1] = acc;
+				acc = invoke_callback_binding(rctx, fnv, cb_argv, 2);
+
+				if (acc.type == MAESTRO_VAL_INVALID)
+					BUILTIN_FAIL("callback failed");
+			}
+		}
+
+		out = acc;
 		goto out;
 	}
 

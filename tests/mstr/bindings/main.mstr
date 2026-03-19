@@ -1,4 +1,4 @@
-(module tests bindings main)
+(module 'tests 'bindings 'main)
 (state (start)
   (steps
     (let x 1)

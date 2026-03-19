@@ -1,4 +1,4 @@
-(module tests external main)
+(module 'tests 'external 'main)
 (define (echo msg) external)
 (state (start)
   (steps

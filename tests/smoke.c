@@ -211,22 +211,85 @@ static int run_case_check_args(maestro_ctx *ctx, const char *module_path,
         return 0;
 }
 
+static int expect_link_fail(const char *src) {
+        maestro_asts *asts = maestro_asts_new();
+        const char *srcs[1];
+        FILE *fp;
+        int ret;
+
+        if (!asts)
+                return 1;
+
+        srcs[0] = src;
+        ret = maestro_parse_list(asts, stderr, srcs, 1);
+
+        if (ret) {
+                maestro_asts_free(asts);
+                return 1;
+        }
+
+        fp = tmpfile();
+
+        if (!fp) {
+                maestro_asts_free(asts);
+                return 1;
+        }
+
+        ret = maestro_link(fp, asts);
+        fclose(fp);
+        maestro_asts_free(asts);
+
+        if (!ret) {
+                fprintf(stderr, "expected link failure for %s\n", src);
+                return 1;
+        }
+
+        return 0;
+}
+
+static int expect_parse_fail(const char *path, const char *buf) {
+        maestro_asts *asts;
+        int ret;
+
+        ret = write_file(path, buf);
+
+        if (ret) {
+                fprintf(stderr, "write %s failed: %d\n", path, ret);
+                return 1;
+        }
+
+        asts = maestro_asts_new();
+
+        if (!asts)
+                return 1;
+
+        ret = maestro_parse_file(asts, stderr, path);
+        maestro_asts_free(asts);
+
+        if (!ret) {
+                fprintf(stderr, "expected parse failure for %s\n", path);
+                return 1;
+        }
+
+        return 0;
+}
+
 int main(void) {
         static const struct file_case files[] = {
                 {
                         .path = "examples/sample.mstr",
                         .buf =
-                                "(module sample)\n"
+                                "(module 'sample)\n"
                                 "(state (start)\n"
                                 "  (steps\n"
                                 "    (let user empty-object)\n"
-                                "    (set user name \"Ada\")\n"
-                                "    (transition end (concat \"hello \" (get user name)))))\n",
+                                "    (set user 'name \"Ada\")\n"
+                                "    (transition end (concat \"hello \" (get user 'name)))))\n",
                 },
                 {
                         .path = "examples/lib-strings.mstr",
                         .buf =
-                        "(module lib strings)\n"
+                        "(module 'lib 'strings)\n"
                         "(export *)\n"
                         "(define copy concat)\n"
                         "(define answer \"wild\")\n",
@@ -234,9 +297,9 @@ int main(void) {
                 {
                         .path = "examples/app-imports.mstr",
                         .buf =
-                        "(module app imports)\n"
-                        "(import lib strings copy)\n"
-                        "(import lib strings *)\n"
+                        "(module 'app 'imports)\n"
+                        "(import 'lib 'strings 'copy)\n"
+                        "(import 'lib 'strings '*)\n"
                         "(state (start)\n"
                         "  (steps\n"
                         "    (transition end (concat (copy \"im\" \"port\") \":\" answer))))\n",
@@ -244,31 +307,31 @@ int main(void) {
                 {
                         .path = "examples/app-refs.mstr",
                         .buf =
-                        "(module app refs)\n"
+                        "(module 'app 'refs)\n"
                         "(define (inc (ref x)) (set x (+ x 1)))\n"
                         "(state (start)\n"
                         "  (steps\n"
                         "    (let user empty-object)\n"
-                        "    (set user age 41)\n"
-                        "    (let age (ref user age))\n"
+                        "    (set user 'age 41)\n"
+                        "    (let age (ref user 'age))\n"
                         "    (inc age)\n"
-                        "    (transition end (get user age))))\n",
+                        "    (transition end (get user 'age))))\n",
                 },
                 {
                         .path = "examples/app-last.mstr",
                         .buf =
-                        "(module app last)\n"
+                        "(module 'app 'last)\n"
                         "(state (start)\n"
                         "  (steps\n"
                         "    (transition next \"alpha\")))\n"
                         "(state (next)\n"
                         "  (steps\n"
-                        "    (transition end (get last-state val))))\n",
+                        "    (transition end (get last-state 'val))))\n",
                 },
                 {
                         .path = "examples/app-worker.mstr",
                         .buf =
-                        "(module app worker)\n"
+                        "(module 'app 'worker)\n"
                         "(state (start name)\n"
                         "  (steps\n"
                         "    (transition end (concat \"worker:\" name))))\n",
@@ -276,8 +339,8 @@ int main(void) {
                 {
                         .path = "examples/app-caller.mstr",
                         .buf =
-                        "(module app caller)\n"
-                        "(define worker (import-program app worker))\n"
+                        "(module 'app 'caller)\n"
+                        "(define worker (import-program 'app 'worker))\n"
                         "(state (start)\n"
                         "  (steps\n"
                         "    (let msg (run worker (list \"Ada\")))\n"
@@ -286,25 +349,25 @@ int main(void) {
                 {
                         .path = "examples/app-json.mstr",
                         .buf =
-                        "(module app json)\n"
+                        "(module 'app 'json)\n"
                         "(state (start)\n"
                         "  (steps\n"
                         "    (let age 37)\n"
                         "    (let user {\"name\":\"Ada\",\"age\":(+ age 1),\"tags\":(list \"x\" \"y\")})\n"
-                        "    (transition end (get user age))))\n",
+                        "    (transition end (get user 'age))))\n",
                 },
                 {
                         .path = "examples/app-handoff-src.mstr",
                         .buf =
-                        "(module app handoff src)\n"
+                        "(module 'app 'handoff 'src)\n"
                         "(state (start)\n"
                         "  (steps\n"
-                        "    (transition (import app handoff dst done))))\n",
+                        "    (transition (import 'app 'handoff 'dst 'done))))\n",
                 },
                 {
                         .path = "examples/app-handoff-dst.mstr",
                         .buf =
-                        "(module app handoff dst)\n"
+                        "(module 'app 'handoff 'dst)\n"
                         "(export done)\n"
                         "(state (done)\n"
                         "  (steps\n"
@@ -313,7 +376,7 @@ int main(void) {
                 {
                         .path = "examples/app-external.mstr",
                         .buf =
-                        "(module app external)\n"
+                        "(module 'app 'external)\n"
                         "(define (echo msg) external)\n"
                         "(state (start)\n"
                         "  (steps\n"
@@ -417,6 +480,18 @@ int main(void) {
         }
 
         if (run_case_check_args(ctx, "app worker", "worker:Ada"))
+                return 1;
+
+        if (expect_link_fail("tests/mstr/compile-fail/bad-hof-state.mstr"))
+                return 1;
+
+        if (expect_link_fail("tests/mstr/compile-fail/bad-hof-value.mstr"))
+                return 1;
+
+        if (expect_parse_fail("build/bad-parse.mstr",
+                              "(module 'bad)\n"
+                              "(state (start)\n"
+                              "  (transition end 7)))\n"))
                 return 1;
 
         maestro_ctx_free(ctx);

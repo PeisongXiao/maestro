@@ -50,7 +50,13 @@ Reference repository:
   - [concat](#concat)
   - [append](#append)
   - [to-string](#to-string)
+- [Higher-Order Functions](#higher-order-functions)
+  - [map](#map)
+  - [filter](#filter)
+  - [foldl and foldr](#foldl-and-foldr)
+  - [any? and all?](#any-and-all)
 - [Data Object Access](#data-object-access)
+  - [probe](#probe)
 - [let and set](#let-and-set)
 - [Case Expressions](#case-expressions)
 - [External Function Bindings](#external-function-bindings)
@@ -165,7 +171,7 @@ existing binding and obeys normal shadowing rules.
 Modules are defined with the following syntax:
 
 ```lisp
-(module parent-module ... this-module)
+(module 'parent-module ... 'this-module)
 ```
 
 A valid Maestro source file must contain exactly one module statement.
@@ -173,8 +179,11 @@ A valid Maestro source file must contain exactly one module statement.
 Example:
 
 ```lisp
-(module std strings)
+(module 'std 'strings)
 ```
+
+In Maestro source, path segments are written as symbol literals. This
+applies uniformly to module paths and data-object paths.
 
 ### Exports
 
@@ -202,32 +211,32 @@ Example:
 Imports are defined using the following syntax:
 
 ```lisp
-(define local-name (import module-path identifier))
+(define local-name (import 'module-path ... 'identifier))
 ```
 
 Shorthand imports are also allowed:
 
 ```lisp
-(import module-path identifier)
+(import 'module-path ... 'identifier)
 ```
 
 This is shorthand for:
 
 ```lisp
-(define identifier (import module-path identifier))
+(define identifier (import 'module-path ... 'identifier))
 ```
 
 Wildcard imports are allowed:
 
 ```lisp
-(import module-path *)
+(import 'module-path ... '*)
 ```
 
 This resolves to a set of definitions:
 
 ```lisp
-(define identifier-1 (import module-path identifier-1))
-(define identifier-2 (import module-path identifier-2))
+(define identifier-1 (import 'module-path ... 'identifier-1))
+(define identifier-2 (import 'module-path ... 'identifier-2))
 ```
 
 Non-aliased imports must check for name collisions.
@@ -235,7 +244,7 @@ Non-aliased imports must check for name collisions.
 Subprograms are imported with:
 
 ```lisp
-(define subprogram (import-program module-path))
+(define subprogram (import-program 'module-path ...))
 ```
 
 `import-program` may target a program even if its `start` state was
@@ -255,15 +264,15 @@ Examples:
 ```lisp
 (state (next)
   (steps
-    (transition (import app states done))))
+    (transition (import 'app 'states 'done))))
 ```
 
 Example:
 
 ```lisp
-(define substr (import std strings substr))
-(import std strings concat)
-(define worker (import-program app worker))
+(define substr (import 'std 'strings 'substr))
+(import 'std 'strings 'concat)
+(define worker (import-program 'app 'worker))
 ```
 
 ## Macros
@@ -387,9 +396,9 @@ Program and subprogram return values may be any valid Maestro value.
 
 `last-state` is a reserved runtime data object with two fields:
 
-- `(get last-state val)` returns the captured return value of the
+- `(get last-state 'val)` returns the captured return value of the
   previous state
-- `(get last-state state)` returns a reference to the previous state
+- `(get last-state 'state)` returns a reference to the previous state
 
 When starting a new program, `last-state` is initialized by the
 runtime so that its `state` field is `start` and its `val` field is
@@ -463,7 +472,7 @@ Examples:
 (transition idle)
 (transition end 0)
 (transition end "done")
-(transition (import app states done))
+(transition (import 'app 'states 'done))
 ```
 
 ### run
@@ -494,7 +503,7 @@ returns to the caller program.
 Examples:
 
 ```lisp
-(define worker (import-program app worker))
+(define worker (import-program 'app 'worker))
 (run worker empty-list)
 ```
 
@@ -635,8 +644,8 @@ Example:
 
 ```lisp
 (let user empty-object)
-(set user profile name "Ada")
-(set user profile age 37)
+(set user 'profile 'name "Ada")
+(set user 'profile 'age 37)
 (let parsed-user {"name":"Ada","age":37})
 (let age 37)
 (let computed-user {"name":"Ada","age":(+ age 1)})
@@ -687,8 +696,8 @@ Example:
 
 ```lisp
 (let user empty-object)
-(set user profile age 37)
-(let r (ref user profile age))
+(set user 'profile 'age 37)
+(let r (ref user 'profile 'age))
 
 (define (inc-age (ref age))
   (set age (+ age 1)))
@@ -721,7 +730,7 @@ Examples:
 (integer? 42)
 (float? 3.14)
 (symbol? 'idle)
-(let age-ref (ref user profile age))
+(let age-ref (ref user 'profile 'age))
 (ref? age-ref)
 (state? start)
 (macro? concat)
@@ -1014,48 +1023,168 @@ Type-check timing:
 - parse-time: arity only
 - runtime: number-or-symbol type-checking and string conversion
 
-## Data Object Access
+## Higher-Order Functions
 
-Data objects are accessed by path. `get`, `let`, `set`, and `ref` all
-share the same path trait.
+Maestro provides the following higher-order functions:
 
-The path forms are:
+- `map`
+- `filter`
+- `foldl`
+- `foldr`
+- `any?`
+- `all?`
+
+The callback argument must be bound to either:
+
+- a macro defined in Maestro source
+- an externally defined host binding
+
+States, programs, and plain data values are not valid higher-order
+callbacks.
+
+### map
 
 ```lisp
-(get data-object-identifier path ...)
-(ref data-object-identifier path ...)
-(set data-object-identifier path ... value)
-(let data-object-identifier path ... value)
+(map callback list)
 ```
 
-`get` returns a constant view.
+`map` applies `callback` to each item in `list` and returns a new
+list of results.
 
-`ref` returns a mutable reference value.
+### filter
+
+```lisp
+(filter callback list)
+```
+
+`filter` applies `callback` to each item in `list` and keeps the
+items whose callback result is truthy.
+
+### foldl and foldr
+
+```lisp
+(foldl callback init list)
+(foldr callback init list)
+```
+
+`foldl` calls its callback as `(callback accumulator item)`.
+
+`foldr` calls its callback as `(callback item accumulator)`.
+
+### any? and all?
+
+```lisp
+(any? callback list)
+(all? callback list)
+```
+
+`any?` returns `true` if any callback result is truthy.
+
+`all?` returns `true` only if every callback result is truthy.
+
+Examples:
+
+```lisp
+(define (inc x) (+ x 1))
+(define (even? x) (= (% x 2) 0))
+(define (sum acc x) (+ acc x))
+
+(map inc (list 1 2 3))
+(filter even? (list 1 2 3 4))
+(foldl sum 0 (list 1 2 3 4))
+(any? even? (list 1 3 4))
+```
+
+## Data Object Access
+
+Data objects are accessed by path. Path operands are dynamic
+expressions and must evaluate to symbols at runtime.
+
+Read and introspection forms accept any expression root that evaluates
+to a value:
+
+```lisp
+(get data-object-expression path-expression ...)
+(probe data-object-expression)
+```
+
+Mutation and reference forms still require a binding root:
+
+```lisp
+(ref data-object-identifier path-expression ...)
+(set data-object-identifier path-expression ... value)
+(let data-object-identifier path-expression ... value)
+```
+
+`get` returns a constant view and requires at least one path operand.
+
+`ref` returns a mutable reference value. `(ref data-object-identifier)`
+with no path operands is valid and returns a reference to the root
+binding.
 
 `set` auto-creates missing intermediate object nodes when assigning by
 path.
 
 Path-based `let` is equivalent to `set`.
 
-If a path is missing in `get` or `ref`, the runtime must raise an
+Missing-path behavior:
+
+- `get` returns `empty-object` when any requested path segment is
+  absent
+- `ref` raises a runtime `ERROR` when any requested path segment is
+  absent
+- `set` and path-based `let` auto-create missing intermediate object
+  nodes
+
+If a non-object value is encountered before the final path segment,
+`get`, `ref`, `set`, and path-based `let` all raise a runtime
+`ERROR`.
+
+If any evaluated path operand is not a symbol, the runtime raises an
 `ERROR`.
 
 Type-check timing:
 
 - parse-time: form shape only
-- runtime: object path resolution, missing-path detection,
-  intermediate object creation for `set`, and reference creation
+- runtime: root evaluation for `get`/`probe`, symbol-path evaluation,
+  object path resolution, missing-path detection, intermediate object
+  creation for `set`, and reference creation
 
 Examples:
 
 ```lisp
 (let user empty-object)
+(let profile 'profile)
+(let name 'name)
 (set user profile name "Ada")
 (get user profile name)
-(let age-ref (ref user profile age))
-(let user profile age 38)
-(let foo val "string")
-(set foo val 1)
+(get user profile 'missing)        ;; => empty-object
+(let age-ref (ref user profile 'age))
+(let user profile 'age 38)
+(let foo 'val "string")
+(set foo 'val 1)
+(get (json-parse "{\"user\":{\"name\":\"Ada\"}}") 'user 'name)
+```
+
+### probe
+
+```lisp
+(probe data-object)
+```
+
+`probe` returns a list of the first-level keys of `data-object` as
+symbols.
+
+If `data-object` is not an object, `probe` returns `empty-list`.
+
+`probe` does not provide any ordering guarantees for the returned keys.
+
+Example:
+
+```lisp
+(let user {"name":"Ada","age":37})
+(probe user)
+(probe "leaf") ;; => empty-list
 ```
 
 ## let and set
@@ -1073,7 +1202,7 @@ This binds or replaces `var` explicitly.
 If a path is given, the form is:
 
 ```lisp
-(let var path ... value)
+(let var 'path ... value)
 ```
 
 This is equivalent to `set`.
@@ -1096,8 +1225,8 @@ Example:
 
 ```lisp
 (let user empty-object)
-(set user profile age 37)
-(let r (ref user profile age))
+(set user 'profile 'age 37)
+(let r (ref user 'profile 'age))
 (set r 38)
 ```
 
@@ -1231,7 +1360,7 @@ Generated JSON examples:
 ### Simple Arithmetic
 
 ```lisp
-(module examples arithmetic)
+(module 'examples 'arithmetic)
 
 (state (start)
   (steps
@@ -1243,7 +1372,7 @@ Generated JSON examples:
 ### Lists and Strings
 
 ```lisp
-(module examples data)
+(module 'examples 'data)
 
 (state (start)
   (steps
@@ -1256,7 +1385,7 @@ Generated JSON examples:
 ### Data Objects and References
 
 ```lisp
-(module examples refs)
+(module 'examples 'refs)
 
 (define (birthday (ref age))
   (set age (+ age 1)))
@@ -1264,17 +1393,17 @@ Generated JSON examples:
 (state (start)
   (steps
     (let user empty-object)
-    (set user profile name "Ada")
-    (set user profile age 37)
-    (birthday age)
-    (print (to-string (get user profile age)))
+    (set user 'profile 'name "Ada")
+    (set user 'profile 'age 37)
+    (birthday (ref user 'profile 'age))
+    (print (to-string (get user 'profile 'age)))
     (transition start)))
 ```
 
 ### Case and Booleans
 
 ```lisp
-(module examples control)
+(module 'examples 'control)
 
 (state (start)
   (steps

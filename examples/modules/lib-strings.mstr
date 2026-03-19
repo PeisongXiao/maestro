@@ -1,4 +1,4 @@
-(module lib strings)
+(module 'lib 'strings)
 (export *)
 (define copy concat)
 (define answer "wild")

@@ -1,0 +1,13 @@
+(module 'tests 'objects 'probe)
+
+(define (is-symbol x) (symbol? x))
+
+(state (start)
+  (steps
+    (let obj {"name":"Ada","age":37})
+    (transition end
+      (list
+        (all? is-symbol (probe obj))
+        (empty? (probe obj))
+        (empty? (probe "leaf"))
+        (empty? (probe (get obj 'name)))))))

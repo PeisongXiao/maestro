@@ -1,4 +1,4 @@
-(module tests lists main)
+(module 'tests 'lists 'main)
 (state (start)
   (steps
     (transition end

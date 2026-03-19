@@ -1,5 +1,5 @@
-(module tests modules caller)
-(define worker (import-program tests modules worker))
+(module 'tests 'modules 'caller)
+(define worker (import-program 'tests 'modules 'worker))
 (state (start)
   (steps
     (let msg (run worker (list "Ada")))

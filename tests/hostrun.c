@@ -249,6 +249,34 @@ static int fn_host_check(maestro_ctx *ctx, maestro_value **args, size_t argc,
         *result = maestro_value_new_string(ctx, "checked");
         return *result ? 0 : MAESTRO_ERR_NOMEM;
 }
+
+static int fn_host_inc(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                       maestro_value **result) {
+        maestro_int_t i;
+
+        if (!ctx || !args || !result || argc != 1)
+                return MAESTRO_ERR_RUNTIME;
+
+        if (maestro_value_as_int(args[0], &i))
+                return MAESTRO_ERR_RUNTIME;
+
+        *result = maestro_value_new_int(ctx, i + 1);
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
+
+static int fn_host_even(maestro_ctx *ctx, maestro_value **args, size_t argc,
+                        maestro_value **result) {
+        maestro_int_t i;
+
+        if (!ctx || !args || !result || argc != 1)
+                return MAESTRO_ERR_RUNTIME;
+
+        if (maestro_value_as_int(args[0], &i))
+                return MAESTRO_ERR_RUNTIME;
+
+        *result = maestro_value_new_bool(ctx, (i % 2) == 0);
+        return *result ? 0 : MAESTRO_ERR_NOMEM;
+}
 static void *slurp(const char *path, size_t *len) {
         FILE *fp;
         long end;
@@ -464,7 +492,9 @@ int main(int argc, char **argv) {
             maestro_register_fn(ctx, "host-symbol", fn_host_symbol) ||
             maestro_register_fn(ctx, "host-list", fn_host_list) ||
             maestro_register_fn(ctx, "host-object", fn_host_object) ||
-            maestro_register_fn(ctx, "host-check", fn_host_check)) {
+            maestro_register_fn(ctx, "host-check", fn_host_check) ||
+            maestro_register_fn(ctx, "host-inc", fn_host_inc) ||
+            maestro_register_fn(ctx, "host-even", fn_host_even)) {
                 fprintf(stderr, "register functions failed\n");
                 goto out;
         }

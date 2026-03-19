@@ -1,4 +1,4 @@
-(module tests integration accessors)
+(module 'tests 'integration 'accessors)
 (define (host-int) external)
 (define (host-float) external)
 (define (host-bool) external)

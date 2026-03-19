@@ -1,0 +1,11 @@
+(module 'tests 'higherorder 'external)
+
+(define (host-inc x) external)
+(define (host-even x) external)
+
+(state (start)
+  (transition end
+    (list
+      (map host-inc (list 1 2 3))
+      (filter host-even (list 1 2 3 4))
+      (any? host-even (list 1 3 5 6)))))

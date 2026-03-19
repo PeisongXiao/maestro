@@ -1,0 +1,8 @@
+(module 'tests 'objects 'wrong-type)
+(state (start)
+  (steps
+    (let foo empty-object)
+    (let profile 'profile)
+    (let name 'name)
+    (set foo profile "Ada")
+    (transition end (get foo profile name))))

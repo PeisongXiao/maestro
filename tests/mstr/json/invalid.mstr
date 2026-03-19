@@ -1,5 +1,5 @@
-(module tests json invalid)
+(module 'tests 'json 'invalid)
 (state (start)
   (steps
     (let bad {"tags":(list 'x 'y)})
-    (transition end (get bad tags))))
+    (transition end (get bad 'tags))))

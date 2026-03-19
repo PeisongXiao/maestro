@@ -1,0 +1,5 @@
+(module 'tests 'objects 'invalid-get)
+(state (start)
+  (steps
+    (let foo empty-object)
+    (transition end (get foo))))

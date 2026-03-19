@@ -1,0 +1,27 @@
+(module 'tests 'higherorder 'main)
+
+(define (inc x) (+ x 1))
+(define (even? x) (= (% x 2) 0))
+(define (sum acc x) (+ acc x))
+(define (joinr x acc) (concat (to-string x) acc))
+(define (is-alpha? x) (= x 'alpha))
+(define (is-beta? x) (= x 'beta))
+(define (is-symbol x) (symbol? x))
+
+(state (start)
+  (steps
+    (let obj empty-object)
+    (set obj 'alpha 1)
+    (set obj 'beta 2)
+    (transition end
+      (list
+        (map inc (list 1 2 3))
+        (filter even? (list 1 2 3 4))
+        (foldl sum 0 (list 1 2 3 4))
+        (foldr joinr "" (list 1 2 3))
+        (any? even? (list 1 3 4))
+        (all? even? (list 2 4 6))
+        (list
+          (all? is-symbol (probe obj))
+          (any? is-alpha? (probe obj))
+          (any? is-beta? (probe obj)))))))

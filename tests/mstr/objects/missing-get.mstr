@@ -1,0 +1,13 @@
+(module 'tests 'objects 'missing-get)
+(state (start)
+  (steps
+    (let foo empty-object)
+    (let profile 'profile)
+    (let missing 'missing)
+    (set foo profile 'name "Ada")
+    (transition end
+      (list
+        (object? (get foo missing))
+        (empty? (get foo missing))
+        (object? (get foo profile missing))
+        (empty? (get foo profile missing))))))

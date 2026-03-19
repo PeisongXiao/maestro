@@ -1,0 +1,8 @@
+(module 'tests 'compile-fail 'bad-hof-state)
+
+(state (step x)
+  (transition end x))
+
+(state (start)
+  (transition end
+    (map step (list 1 2 3))))

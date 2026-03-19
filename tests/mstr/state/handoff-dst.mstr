@@ -1,4 +1,4 @@
-(module tests state handoff dst)
+(module 'tests 'state 'handoff 'dst)
 (export done)
 (state (done)
   (steps

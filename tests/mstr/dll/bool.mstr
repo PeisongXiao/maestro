@@ -1,4 +1,4 @@
-(module tests dll bool)
+(module 'tests 'dll 'bool)
 (define (dll-bool) external)
 (state (start)
   (transition end (dll-bool)))

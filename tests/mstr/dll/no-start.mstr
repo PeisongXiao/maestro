@@ -1,2 +1,2 @@
-(module tests dll no-start)
+(module 'tests 'dll 'no-start)
 (define answer 7)

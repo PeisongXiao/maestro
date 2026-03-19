@@ -1,4 +1,4 @@
-(module tests dll float)
+(module 'tests 'dll 'float)
 (define (dll-float) external)
 (state (start)
   (transition end (dll-float)))

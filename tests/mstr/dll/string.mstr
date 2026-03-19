@@ -1,4 +1,4 @@
-(module tests dll string)
+(module 'tests 'dll 'string)
 (define (dll-string) external)
 (state (start)
   (transition end (dll-string)))

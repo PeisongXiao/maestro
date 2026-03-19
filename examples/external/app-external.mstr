@@ -1,4 +1,4 @@
-(module app external)
+(module 'app 'external)
 (define (echo msg) external)
 (state (start)
   (steps

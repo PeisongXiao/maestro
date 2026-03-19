@@ -1,0 +1,5 @@
+(module 'tests 'objects 'expr-root)
+(state (start)
+  (steps
+    (transition end
+      (get (json-parse "{\"user\":{\"name\":\"Ada\"}}") 'user 'name))))

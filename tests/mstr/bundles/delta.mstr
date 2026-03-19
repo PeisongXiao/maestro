@@ -1,5 +1,5 @@
-(module tests bundles delta)
-(import tests bundles lib decorate)
+(module 'tests 'bundles 'delta)
+(import 'tests 'bundles 'lib 'decorate)
 (state (start)
   (steps
     (transition end (decorate "delta" "ok"))))

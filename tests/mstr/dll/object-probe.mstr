@@ -1,6 +1,6 @@
-(module tests dll object-probe)
+(module 'tests 'dll 'object-probe)
 (define (dll-object) external)
 (state (start)
   (steps
     (let obj (dll-object))
-    (transition end (concat (get obj user name) ":" (get obj user meta active)))))
+    (transition end (concat (get obj 'user 'name) ":" (get obj 'user 'meta 'active)))))

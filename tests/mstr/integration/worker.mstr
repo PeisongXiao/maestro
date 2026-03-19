@@ -1,8 +1,8 @@
-(module tests integration worker)
+(module 'tests 'integration 'worker)
 (state (start payload)
   (steps
     (case
-      ((= (get payload kind) "bundle")
-       (transition end (json {"seen":(get payload seen),"tag":"worker"})))
+      ((= (get payload 'kind) "bundle")
+       (transition end (json {"seen":(get payload 'seen),"tag":"worker"})))
       (default
        (transition end (json payload))))))
