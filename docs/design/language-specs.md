@@ -153,8 +153,13 @@ There are two kinds of scopes in Maestro:
 States are special macros, so state execution creates per-macro scope
 as well, with extra runtime metadata attached by the VM.
 
-Global definitions in a module are not ordered. Missing global
-definitions are checked at parse time.
+Global definitions in a module are not ordered. Missing identifiers in
+normal expression positions are checked at link time across the whole
+artifact.
+
+Object-path operands are the exception: they remain runtime
+expressions and are not statically resolved as identifier bindings by
+the linker.
 
 Definitions inside `steps` are strongly ordered.
 
@@ -1175,6 +1180,9 @@ Examples:
 
 Data objects are accessed by path. Path operands are dynamic
 expressions and must evaluate to symbols at runtime.
+
+Object-path existence is always resolved at runtime, including when a
+path operand is written as a symbol literal like `'name`.
 
 Read and introspection forms accept any expression root that evaluates
 to a value:

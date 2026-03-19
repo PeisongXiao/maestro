@@ -86,11 +86,104 @@ struct ast_resolve_frame {
         struct ast_resolve_frame *up;
 };
 
+struct validate_scope {
+        struct validate_scope *up;
+        const char **names;
+        size_t nr;
+        size_t cap;
+};
+
 static bool ast_resolving(struct ast_resolve_frame *frame, maestro_ast *ast,
                           const char *name) {
         for (; frame; frame = frame->up) {
                 if (frame->ast == ast && !strcmp(frame->name, name))
                         return true;
+        }
+
+        return false;
+}
+
+static bool is_reserved_literal(const char *name) {
+        static const char *const names[] = {
+                "true", "false", "empty-string", "empty-list", "empty-object",
+                "default", "start", "end", "last-state"
+        };
+        size_t i;
+
+        if (!name)
+                return false;
+
+        for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+                if (!strcmp(name, names[i]))
+                        return true;
+        }
+
+        return false;
+}
+
+static bool is_builtin_name_link(const char *name) {
+        static const char *const builtins[] = {
+                "list", "cons", "json", "json-parse",
+                "and", "or", "not", "+", "-", "*", "/", "%",
+                "=", "!=", "<", "<=", ">", ">=", "ref=?",
+                "concat", "append", "first", "rest", "nth",
+                "substr", "to-string", "floor", "ceil",
+                "map", "filter", "foldl", "foldr", "any?", "all?", "probe",
+                "log", "print", "empty?", "true?", "false?",
+                "number?", "integer?", "float?", "string?", "list?",
+                "object?", "symbol?", "boolean?", "ref?", "state?",
+                "macro?", "get", "ref", "set", "let", "steps",
+                "case", "transition", "run", "import", "import-program"
+        };
+        size_t i;
+
+        if (!name)
+                return false;
+
+        for (i = 0; i < sizeof(builtins) / sizeof(builtins[0]); i++) {
+                if (!strcmp(name, builtins[i]))
+                        return true;
+        }
+
+        return false;
+}
+
+static int scope_add_name(struct validate_scope *scope, const char *name) {
+        const char **nv;
+        size_t i;
+
+        if (!scope || !name)
+                return 0;
+
+        for (i = 0; i < scope->nr; i++) {
+                if (!strcmp(scope->names[i], name))
+                        return 0;
+        }
+
+        if (scope->nr == scope->cap) {
+                size_t ncap = scope->cap ? scope->cap * 2 : 8;
+
+                nv = realloc(scope->names, ncap * sizeof(*nv));
+
+                if (!nv)
+                        return -1;
+
+                scope->names = nv;
+                scope->cap = ncap;
+        }
+
+        scope->names[scope->nr++] = name;
+        return 0;
+}
+
+static bool scope_has_name(struct validate_scope *scope, const char *name) {
+        size_t i;
+
+        for (; scope; scope = scope->up) {
+                for (i = 0; i < scope->nr; i++) {
+                        if (!strcmp(scope->names[i], name))
+                                return true;
+                }
         }
 
         return false;
@@ -173,6 +266,9 @@ static enum ast_binding_kind resolve_binding_kind(maestro_asts *asts,
 
         if (!asts || !ast || !name)
                 return AST_BIND_NONE;
+
+        if (is_reserved_literal(name) || is_builtin_name_link(name))
+                return AST_BIND_VALUE;
 
         if (ast_resolving(frame, ast, name))
                 return AST_BIND_NONE;
@@ -277,6 +373,231 @@ static int validate_higher_order(FILE *err, maestro_asts *asts,
 
         for (i = 0; i < node->kv_nr; i++) {
                 if (validate_higher_order(err, asts, ast, node->kv[i].value))
+                        return -1;
+        }
+
+        return 0;
+}
+
+static int validate_identifier_uses(FILE *err, maestro_asts *asts,
+                                    maestro_ast *ast, maestro_ast_node *node,
+                                    struct validate_scope *scope);
+
+static int validate_steps(FILE *err, maestro_asts *asts, maestro_ast *ast,
+                          maestro_ast_node *node, struct validate_scope *up) {
+        struct validate_scope scope = { .up = up };
+        uint32_t i;
+        int rc = 0;
+
+        for (i = 1; i < node->child_nr; i++) {
+                maestro_ast_node *stmt = node->child[i];
+
+                rc = validate_identifier_uses(err, asts, ast, stmt, &scope);
+
+                if (rc)
+                        break;
+
+                if (stmt && stmt->type == MAESTRO_AST_FORM && stmt->child_nr >= 2 &&
+                    node_ident(stmt->child[0]) &&
+                    !strcmp(node_ident(stmt->child[0]), "let") &&
+                    stmt->child[1]->type == MAESTRO_AST_IDENT &&
+                    scope_add_name(&scope, stmt->child[1]->text)) {
+                        rc = -1;
+                        break;
+                }
+        }
+
+        free(scope.names);
+        return rc;
+}
+
+static int validate_identifier_uses(FILE *err, maestro_asts *asts,
+                                    maestro_ast *ast, maestro_ast_node *node,
+                                    struct validate_scope *scope) {
+        uint32_t i;
+
+        if (!node)
+                return 0;
+
+        if (node->type == MAESTRO_AST_IDENT) {
+                if (is_reserved_literal(node->text) || is_builtin_name_link(node->text) ||
+                    scope_has_name(scope, node->text) ||
+                    resolve_binding_kind(asts, ast, node->text, NULL) != AST_BIND_NONE)
+                        return 0;
+
+                diagf(err, "undefined identifier %s\n", node->text);
+                return -1;
+        }
+
+        if (node->type != MAESTRO_AST_FORM) {
+                for (i = 0; i < node->child_nr; i++) {
+                        if (validate_identifier_uses(err, asts, ast, node->child[i], scope))
+                                return -1;
+                }
+
+                for (i = 0; i < node->kv_nr; i++) {
+                        if (validate_identifier_uses(err, asts, ast, node->kv[i].value, scope))
+                                return -1;
+                }
+
+                return 0;
+        }
+
+        if (node->child_nr == 0)
+                return 0;
+
+        if (node_ident(node->child[0])) {
+                const char *op = node_ident(node->child[0]);
+
+                if (!strcmp(op, "module") || !strcmp(op, "export") ||
+                    !strcmp(op, "import") || !strcmp(op, "import-program"))
+                        return 0;
+
+                if (!strcmp(op, "steps"))
+                        return validate_steps(err, asts, ast, node, scope);
+
+                if (!strcmp(op, "define") && node->child_nr >= 3) {
+                        maestro_ast_node *sig = node->child[1];
+
+                        if (node->child[2]->type == MAESTRO_AST_IDENT &&
+                            !strcmp(node->child[2]->text, "external"))
+                                return 0;
+
+                        if (sig->type == MAESTRO_AST_FORM && sig->child_nr >= 1) {
+                                struct validate_scope call_scope = { .up = scope };
+
+                                for (i = 1; i < sig->child_nr; i++) {
+                                        maestro_ast_node *arg = sig->child[i];
+
+                                        if (arg->type == MAESTRO_AST_IDENT) {
+                                                if (scope_add_name(&call_scope, arg->text)) {
+                                                        free(call_scope.names);
+                                                        return -1;
+                                                }
+                                        } else if (arg->type == MAESTRO_AST_FORM &&
+                                                   arg->child_nr == 2 &&
+                                                   node_ident(arg->child[0]) &&
+                                                   !strcmp(node_ident(arg->child[0]), "ref") &&
+                                                   arg->child[1]->type == MAESTRO_AST_IDENT) {
+                                                if (scope_add_name(&call_scope, arg->child[1]->text)) {
+                                                        free(call_scope.names);
+                                                        return -1;
+                                                }
+                                        }
+                                }
+
+                                i = validate_identifier_uses(err, asts, ast, node->child[2],
+                                                             &call_scope);
+                                free(call_scope.names);
+                                return i;
+                        }
+
+                        return validate_identifier_uses(err, asts, ast, node->child[2], scope);
+                }
+
+                if (!strcmp(op, "state") && node->child_nr >= 3) {
+                        maestro_ast_node *sig = node->child[1];
+                        struct validate_scope call_scope = { .up = scope };
+
+                        if (sig->type != MAESTRO_AST_FORM || sig->child_nr < 1)
+                                return 0;
+
+                        for (i = 1; i < sig->child_nr; i++) {
+                                maestro_ast_node *arg = sig->child[i];
+
+                                if (arg->type == MAESTRO_AST_IDENT) {
+                                        if (scope_add_name(&call_scope, arg->text)) {
+                                                free(call_scope.names);
+                                                return -1;
+                                        }
+                                } else if (arg->type == MAESTRO_AST_FORM &&
+                                           arg->child_nr == 2 &&
+                                           node_ident(arg->child[0]) &&
+                                           !strcmp(node_ident(arg->child[0]), "ref") &&
+                                           arg->child[1]->type == MAESTRO_AST_IDENT) {
+                                        if (scope_add_name(&call_scope, arg->child[1]->text)) {
+                                                free(call_scope.names);
+                                                return -1;
+                                        }
+                                }
+                        }
+
+                        i = validate_identifier_uses(err, asts, ast, node->child[2],
+                                                     &call_scope);
+                        free(call_scope.names);
+                        return i;
+                }
+
+                if (!strcmp(op, "let") && node->child_nr >= 3) {
+                        if (node->child[1]->type != MAESTRO_AST_IDENT)
+                                return 0;
+
+                        if (node->child_nr == 3)
+                                return validate_identifier_uses(err, asts, ast,
+                                                                node->child[2], scope);
+
+                        return validate_identifier_uses(err, asts, ast,
+                                                        node->child[node->child_nr - 1],
+                                                        scope);
+                }
+
+                if (!strcmp(op, "set")) {
+                        if (node->child_nr >= 2 &&
+                            node->child[1]->type == MAESTRO_AST_IDENT &&
+                            !scope_has_name(scope, node->child[1]->text) &&
+                            resolve_binding_kind(asts, ast, node->child[1]->text, NULL) ==
+                            AST_BIND_NONE) {
+                                diagf(err, "undefined identifier %s\n",
+                                      node->child[1]->text);
+                                return -1;
+                        }
+
+                        if (node->child_nr >= 3)
+                                return validate_identifier_uses(err, asts, ast,
+                                                                node->child[node->child_nr - 1],
+                                                                scope);
+
+                        return 0;
+                }
+
+                if (!strcmp(op, "ref")) {
+                        if (node->child_nr >= 2 &&
+                            node->child[1]->type == MAESTRO_AST_IDENT &&
+                            !scope_has_name(scope, node->child[1]->text) &&
+                            resolve_binding_kind(asts, ast, node->child[1]->text, NULL) ==
+                            AST_BIND_NONE) {
+                                diagf(err, "undefined identifier %s\n",
+                                      node->child[1]->text);
+                                return -1;
+                        }
+
+                        return 0;
+                }
+
+                if (!strcmp(op, "get")) {
+                        if (node->child_nr >= 2)
+                                return validate_identifier_uses(err, asts, ast, node->child[1],
+                                                                scope);
+
+                        return 0;
+                }
+
+                if (!strcmp(op, "probe")) {
+                        if (node->child_nr >= 2)
+                                return validate_identifier_uses(err, asts, ast, node->child[1],
+                                                                scope);
+
+                        return 0;
+                }
+        }
+
+        for (i = 0; i < node->child_nr; i++) {
+                if (validate_identifier_uses(err, asts, ast, node->child[i], scope))
+                        return -1;
+        }
+
+        for (i = 0; i < node->kv_nr; i++) {
+                if (validate_identifier_uses(err, asts, ast, node->kv[i].value, scope))
                         return -1;
         }
 
@@ -588,6 +909,9 @@ int maestro_link_ex(FILE *dest, maestro_asts *src, const uint8_t *magic,
                         return MAESTRO_ERR_LINK;
 
                 if (validate_higher_order(stderr, src, ast, ast->root))
+                        return MAESTRO_ERR_LINK;
+
+                if (validate_identifier_uses(stderr, src, ast, ast->root, NULL))
                         return MAESTRO_ERR_LINK;
 
                 mod.path_first = (uint32_t)paths.nr;

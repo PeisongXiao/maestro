@@ -1,0 +1,7 @@
+(module 'tests 'objects 'unbound-path-runtime)
+
+(state (start)
+  (steps
+    (let user {"name":"Ada"})
+    (transition end
+      (get user key))))

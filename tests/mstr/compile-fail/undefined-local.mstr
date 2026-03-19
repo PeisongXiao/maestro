@@ -1,0 +1,7 @@
+(module 'tests 'compile-fail 'undefined-local)
+
+(state (start)
+  (steps
+    (let seen 1)
+    (transition end
+      missing-local)))

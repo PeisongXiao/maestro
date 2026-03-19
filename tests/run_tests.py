@@ -154,6 +154,10 @@ SHALLOW_CASES = {
             "module": "tests objects invalid-get",
             "error": True,
         },
+        {
+            "module": "tests objects unbound-path-runtime",
+            "error": True,
+        },
     ],
     "json": [
         {

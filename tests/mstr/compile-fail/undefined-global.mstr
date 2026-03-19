@@ -1,0 +1,5 @@
+(module 'tests 'compile-fail 'undefined-global)
+
+(state (start)
+  (transition end
+    missing-value))

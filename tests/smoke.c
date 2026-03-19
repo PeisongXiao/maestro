@@ -488,6 +488,15 @@ int main(void) {
         if (expect_link_fail("tests/mstr/compile-fail/bad-hof-value.mstr"))
                 return 1;
 
+        if (expect_link_fail("tests/mstr/compile-fail/undefined-global.mstr"))
+                return 1;
+
+        if (expect_link_fail("tests/mstr/compile-fail/undefined-local.mstr"))
+                return 1;
+
+        if (expect_link_fail("tests/mstr/compile-fail/undefined-dead.mstr"))
+                return 1;
+
         if (expect_parse_fail("build/bad-parse.mstr",
                               "(module 'bad)\n"
                               "(state (start)\n"

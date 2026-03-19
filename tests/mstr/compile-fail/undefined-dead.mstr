@@ -1,0 +1,6 @@
+(module 'tests 'compile-fail 'undefined-dead)
+
+(state (start)
+  (case
+    ((= 1 1) 7)
+    (default missing-value)))
