@@ -75,7 +75,15 @@ SHALLOW_CASES = {
     "lists": [
         {
             "module": "tests lists main",
-            "result": "[1,2,3,4]",
+            "result": "[1,2,3,4,5,ok]",
+        },
+        {
+            "module": "tests lists invalid-concat",
+            "error": True,
+        },
+        {
+            "module": "tests lists invalid-append",
+            "error": True,
         },
     ],
     "objects": [

@@ -1380,7 +1380,7 @@ static bool is_builtin_name(const char *name) {
                 "list", "cons", "json", "json-parse",
                 "and", "or", "not", "+", "-", "*", "/", "%",
                 "=", "!=", "<", "<=", ">", ">=", "ref=?",
-                "concat", "substr", "to-string", "floor", "ceil",
+                "concat", "append", "substr", "to-string", "floor", "ceil",
                 "log", "print", "empty?", "true?", "false?",
                 "number?", "integer?", "float?", "string?", "list?",
                 "object?", "symbol?", "boolean?", "ref?", "state?",
@@ -1917,6 +1917,7 @@ static int builtin_numeric(maestro_ctx *ctx, const char *op,
 #define BUILTIN_FAIL(MSG)            \
 	do {                         \
 		vm_log_builtin_error(rctx, op, MSG); \
+		out = v_invalid();       \
 		goto out;               \
 	} while (0)
 
@@ -2496,16 +2497,41 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
 		if (argv[0].type == MAESTRO_VAL_LIST) {
 			out = v_list(rctx->ctx);
 
-                        for (i = 0; i < argv[0].v.list->nr; i++)
-                                list_push(rctx->ctx, out.v.list, argv[0].v.list->item[i]);
+                        for (i = 0; i < argc; i++) {
+                                size_t j;
+                                argv[i] = deref_value(argv[i]);
 
-                        for (i = 1; i < argc; i++)
-                                list_push(rctx->ctx, out.v.list, deref_value(argv[i]));
+                                if (argv[i].type != MAESTRO_VAL_LIST)
+                                        BUILTIN_FAIL("list concatenation requires list arguments");
+
+                                for (j = 0; j < argv[i].v.list->nr; j++)
+                                        list_push(rctx->ctx, out.v.list, argv[i].v.list->item[j]);
+                        }
 
 			goto out;
 		}
 
 		BUILTIN_FAIL("expected either strings or a leading list");
+	}
+
+	if (!strcmp(op, "append")) {
+		if (argc < 1)
+			BUILTIN_FAIL("expected a leading list");
+
+		argv[0] = deref_value(argv[0]);
+
+		if (argv[0].type != MAESTRO_VAL_LIST)
+			BUILTIN_FAIL("expected a leading list");
+
+		out = v_list(rctx->ctx);
+
+		for (i = 0; i < argv[0].v.list->nr; i++)
+			list_push(rctx->ctx, out.v.list, argv[0].v.list->item[i]);
+
+		for (i = 1; i < argc; i++)
+			list_push(rctx->ctx, out.v.list, deref_value(argv[i]));
+
+		goto out;
 	}
 
 	if (!strcmp(op, "substr")) {

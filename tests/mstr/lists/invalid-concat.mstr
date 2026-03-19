@@ -1,0 +1,4 @@
+(module tests lists invalid-concat)
+(state (start)
+  (transition end
+    (concat (list 1 2) 3)))

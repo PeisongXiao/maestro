@@ -48,6 +48,7 @@ Reference repository:
 - [String and List Processing](#string-and-list-processing)
   - [substr](#substr)
   - [concat](#concat)
+  - [append](#append)
   - [to-string](#to-string)
 - [Data Object Access](#data-object-access)
 - [let and set](#let-and-set)
@@ -917,6 +918,7 @@ The built-in primitives are:
 
 - `substr`
 - `concat`
+- `append`
 - `to-string`
 
 ### substr
@@ -948,8 +950,8 @@ Example:
 
 `concat` is defined for both strings and lists.
 
-`concat` accepts any number of arguments, but at least two. Arguments
-are concatenated in the given order.
+`concat` accepts at least two arguments. Arguments are concatenated in
+the given order.
 
 For strings:
 
@@ -958,7 +960,8 @@ For strings:
 
 For lists:
 
-- the right-hand argument is appended to the list
+- every argument must be a list
+- the input lists are concatenated in order
 - the result is a list
 
 Type-check timing:
@@ -970,7 +973,26 @@ Examples:
 
 ```lisp
 (concat "hello, " "world")
-(concat (list 1 2) 3)
+(concat (list 1 2) (list 3) (list 4 5))
+```
+
+### append
+
+`append` appends arbitrary values to a list.
+
+`append` requires at least one argument. The first argument must be a
+list. Remaining arguments may be any values.
+
+Type-check timing:
+
+- parse-time: arity only
+- runtime: leading-list type-checking
+
+Examples:
+
+```lisp
+(append (list 1 2) 3 4)
+(append (list "a") "b" 'c)
 ```
 
 ### to-string
@@ -1227,7 +1249,7 @@ Generated JSON examples:
   (steps
     (print (substr 0 5 "hello world"))
     (print (concat "mae" "stro"))
-    (let values (concat (list 1 2) 3))
+    (let values (append (concat (list 1 2) (list 3)) 4))
     (transition start)))
 ```
 
