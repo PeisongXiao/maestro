@@ -1,0 +1,4 @@
+(module 'tests 'lists 'invalid-rest-empty)
+(state (start)
+  (transition end
+    (rest empty-list)))

@@ -1,0 +1,4 @@
+(module 'tests 'lists 'invalid-first-empty)
+(state (start)
+  (transition end
+    (first empty-list)))

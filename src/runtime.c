@@ -1392,7 +1392,8 @@ static bool is_builtin_name(const char *name) {
                 "list", "cons", "json", "json-parse",
                 "and", "or", "not", "+", "-", "*", "/", "%",
                 "=", "!=", "<", "<=", ">", ">=", "ref=?",
-                "concat", "append", "substr", "to-string", "floor", "ceil",
+                "concat", "append", "first", "rest", "nth",
+                "substr", "to-string", "floor", "ceil",
                 "map", "filter", "foldl", "foldr", "any?", "all?", "probe",
                 "log", "print", "empty?", "true?", "false?",
                 "number?", "integer?", "float?", "string?", "list?",
@@ -2773,6 +2774,69 @@ static maestro_value eval_call(struct run_ctx *rctx, struct img_mod *mod,
                 for (i = 1; i < argc; i++)
                         list_push(rctx->ctx, out.v.list, deref_value(argv[i]));
 
+                goto out;
+        }
+
+        if (!strcmp(op, "first")) {
+                maestro_value listv;
+
+                if (argc != 1)
+                        BUILTIN_FAIL("expected exactly one list argument");
+
+                listv = deref_value(argv[0]);
+
+                if (listv.type != MAESTRO_VAL_LIST)
+                        BUILTIN_FAIL("expected exactly one list argument");
+
+                if (listv.v.list->nr == 0)
+                        BUILTIN_FAIL("expected a non-empty list");
+
+                out = listv.v.list->item[0];
+                goto out;
+        }
+
+        if (!strcmp(op, "rest")) {
+                maestro_value listv;
+
+                if (argc != 1)
+                        BUILTIN_FAIL("expected exactly one list argument");
+
+                listv = deref_value(argv[0]);
+
+                if (listv.type != MAESTRO_VAL_LIST)
+                        BUILTIN_FAIL("expected exactly one list argument");
+
+                if (listv.v.list->nr == 0)
+                        BUILTIN_FAIL("expected a non-empty list");
+
+                out = v_list(rctx->ctx);
+
+                for (i = 1; i < listv.v.list->nr; i++)
+                        list_push(rctx->ctx, out.v.list, listv.v.list->item[i]);
+
+                goto out;
+        }
+
+        if (!strcmp(op, "nth")) {
+                maestro_value idxv;
+                maestro_value listv;
+
+                if (argc != 2)
+                        BUILTIN_FAIL("expected exactly one integer index and one list argument");
+
+                idxv = deref_value(argv[0]);
+                listv = deref_value(argv[1]);
+
+                if (idxv.type != MAESTRO_VAL_INT || listv.type != MAESTRO_VAL_LIST)
+                        BUILTIN_FAIL("expected exactly one integer index and one list argument");
+
+                if (idxv.v.i < 0)
+                        BUILTIN_FAIL("list index must be non-negative");
+
+                if ((size_t)idxv.v.i >= listv.v.list->nr)
+                        BUILTIN_FAIL("list index is out of range");
+
+                out = listv.v.list->item[idxv.v.i];
                 goto out;
         }
 

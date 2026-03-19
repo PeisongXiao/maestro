@@ -1,0 +1,4 @@
+(module 'tests 'lists 'invalid-nth-type)
+(state (start)
+  (transition end
+    (nth "0" (list 1 2 3))))

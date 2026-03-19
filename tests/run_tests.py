@@ -75,7 +75,7 @@ SHALLOW_CASES = {
     "lists": [
         {
             "module": "tests lists main",
-            "result": "[1,2,3,4,5,ok]",
+            "result": "[1,[2,3,4,5,ok],4,true]",
         },
         {
             "module": "tests lists invalid-concat",
@@ -83,6 +83,34 @@ SHALLOW_CASES = {
         },
         {
             "module": "tests lists invalid-append",
+            "error": True,
+        },
+        {
+            "module": "tests lists invalid-first-empty",
+            "error": True,
+        },
+        {
+            "module": "tests lists invalid-first-type",
+            "error": True,
+        },
+        {
+            "module": "tests lists invalid-rest-type",
+            "error": True,
+        },
+        {
+            "module": "tests lists invalid-rest-empty",
+            "error": True,
+        },
+        {
+            "module": "tests lists invalid-nth-type",
+            "error": True,
+        },
+        {
+            "module": "tests lists invalid-nth-negative",
+            "error": True,
+        },
+        {
+            "module": "tests lists invalid-nth-range",
             "error": True,
         },
     ],

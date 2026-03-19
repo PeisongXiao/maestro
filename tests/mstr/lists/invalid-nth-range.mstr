@@ -1,0 +1,4 @@
+(module 'tests 'lists 'invalid-nth-range)
+(state (start)
+  (transition end
+    (nth 3 (list 1 2 3))))

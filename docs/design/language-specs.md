@@ -49,6 +49,9 @@ Reference repository:
   - [substr](#substr)
   - [concat](#concat)
   - [append](#append)
+  - [first](#first)
+  - [rest](#rest)
+  - [nth](#nth)
   - [to-string](#to-string)
 - [Higher-Order Functions](#higher-order-functions)
   - [map](#map)
@@ -1002,6 +1005,79 @@ Examples:
 ```lisp
 (append (list 1 2) 3 4)
 (append (list "a") "b" 'c)
+```
+
+### first
+
+`first` returns the first element of a non-empty list.
+
+```lisp
+(first list)
+```
+
+Type-check timing:
+
+- parse-time: arity only
+- runtime: list type-checking and non-empty checking
+
+Examples:
+
+```lisp
+(first (list 1 2 3))
+(first (append (list "a") "b"))
+```
+
+### rest
+
+`rest` returns a new list containing every element after the first
+element of a non-empty list.
+
+```lisp
+(rest list)
+```
+
+`rest empty-list` is a runtime `ERROR`.
+
+Type-check timing:
+
+- parse-time: arity only
+- runtime: list type-checking and non-empty checking
+
+Examples:
+
+```lisp
+(rest (list 1 2 3))
+(rest (append (list "a") "b"))
+```
+
+### nth
+
+`nth` returns the zero-indexed element at `index` in `list`.
+
+```lisp
+(nth index list)
+```
+
+`nth` requires:
+
+- an integer index
+- a non-negative index
+- an in-range index
+- a list value
+
+Invalid indices result in a runtime `ERROR`.
+
+Type-check timing:
+
+- parse-time: arity only
+- runtime: integer index checking, non-negative checking, bounds
+  checking, and list type-checking
+
+Examples:
+
+```lisp
+(nth 0 (list "a" "b" "c"))
+(nth 2 (append (list 1 2) 3 4))
 ```
 
 ### to-string

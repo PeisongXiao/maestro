@@ -1,8 +1,14 @@
 (module 'tests 'lists 'main)
 (state (start)
   (steps
-    (transition end
+    (let values
       (append
         (concat (list 1 2) (list 3) (list 4))
         5
-        "ok"))))
+        "ok"))
+    (transition end
+      (list
+        (first values)
+        (rest values)
+        (nth 3 values)
+        (empty? (rest (list 1)))))))
