@@ -97,15 +97,15 @@ static bool ast_resolving(struct ast_resolve_frame *frame, maestro_ast *ast,
 }
 
 static enum ast_binding_kind resolve_binding_kind(maestro_asts *asts,
-                                                  maestro_ast *ast,
-                                                  const char *name,
-                                                  struct ast_resolve_frame *frame);
+                maestro_ast *ast,
+                const char *name,
+                struct ast_resolve_frame *frame);
 
 static enum ast_binding_kind resolve_import_kind(maestro_asts *asts,
-                                                 maestro_ast *ast_unused,
-                                                 maestro_ast_node *form,
-                                                 const char *name,
-                                                 struct ast_resolve_frame *frame) {
+                maestro_ast *ast_unused,
+                maestro_ast_node *form,
+                const char *name,
+                struct ast_resolve_frame *frame) {
         maestro_ast *target;
         const char *import_name;
 
@@ -129,9 +129,9 @@ static enum ast_binding_kind resolve_import_kind(maestro_asts *asts,
 }
 
 static enum ast_binding_kind resolve_body_kind(maestro_asts *asts,
-                                               maestro_ast *ast,
-                                               maestro_ast_node *body,
-                                               struct ast_resolve_frame *frame) {
+                maestro_ast *ast,
+                maestro_ast_node *body,
+                struct ast_resolve_frame *frame) {
         maestro_ast_node *head;
 
         if (!body)
@@ -165,9 +165,9 @@ static enum ast_binding_kind resolve_body_kind(maestro_asts *asts,
 }
 
 static enum ast_binding_kind resolve_binding_kind(maestro_asts *asts,
-                                                  maestro_ast *ast,
-                                                  const char *name,
-                                                  struct ast_resolve_frame *frame) {
+                maestro_ast *ast,
+                const char *name,
+                struct ast_resolve_frame *frame) {
         struct ast_resolve_frame next = {0};
         uint32_t i;
 
@@ -205,9 +205,9 @@ static enum ast_binding_kind resolve_binding_kind(maestro_asts *asts,
                             node_ident(sig->child[0]) &&
                             !strcmp(sig->child[0]->text, name))
                                 return body->type == MAESTRO_AST_IDENT &&
-                                               !strcmp(body->text, "external") ?
-                                               AST_BIND_EXTERNAL :
-                                               AST_BIND_MACRO;
+                                       !strcmp(body->text, "external") ?
+                                       AST_BIND_EXTERNAL :
+                                       AST_BIND_MACRO;
                 }
 
                 if (!strcmp(node_ident(head), "state") && f->child_nr >= 3) {

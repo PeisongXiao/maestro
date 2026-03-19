@@ -526,21 +526,21 @@ static char *value_text(const maestro_value *v) {
                 return dup_text("<value>");
         }
 
-	return NULL;
+        return NULL;
 }
 
 static int stderr_output(maestro_ctx *ctx, const char *msg) {
-	(void)ctx;
-	return fprintf(stderr, "%s", msg);
+        (void)ctx;
+        return fprintf(stderr, "%s", msg);
 }
 
 static int stdout_output(maestro_ctx *ctx, const char *msg) {
-	(void)ctx;
-	return fprintf(stdout, "%s", msg);
+        (void)ctx;
+        return fprintf(stdout, "%s", msg);
 }
 
 static int compile_sources(const struct str_vec *srcs, const char *output_path,
-			   const uint8_t *magic) {
+                           const uint8_t *magic) {
         FILE *out;
         maestro_asts *asts;
         int ret;
@@ -1157,16 +1157,16 @@ int main(int argc, char **argv) {
 
         ctx = maestro_ctx_new();
 
-	if (!ctx) {
-		ret = MAESTRO_ERR_NOMEM;
-		goto out;
-	}
+        if (!ctx) {
+                ret = MAESTRO_ERR_NOMEM;
+                goto out;
+        }
 
-	maestro_ctx_set_output(ctx, stdout_output, stderr_output);
-	maestro_ctx_set_vm_logger(ctx, stderr_output);
+        maestro_ctx_set_output(ctx, stdout_output, stderr_output);
+        maestro_ctx_set_vm_logger(ctx, stderr_output);
 
-	for (i = 0; i < (int)libs.nr; i++) {
-		ret = maestro_ctx_load_dll(ctx, libs.v[i]);
+        for (i = 0; i < (int)libs.nr; i++) {
+                ret = maestro_ctx_load_dll(ctx, libs.v[i]);
 
                 if (ret) {
                         fprintf(stderr, "load dll %s failed\n", libs.v[i]);
@@ -1208,15 +1208,15 @@ int main(int argc, char **argv) {
                 goto out;
         }
 
-	ret = maestro_run(ctx, run_module, run_args, run_argc, &result);
+        ret = maestro_run(ctx, run_module, run_args, run_argc, &result);
 
-	if (ret) {
-		fprintf(stderr, "runtime error: module \"%s\" failed with code %d\n",
-			run_module, ret);
-		goto out;
-	}
+        if (ret) {
+                fprintf(stderr, "runtime error: module \"%s\" failed with code %d\n",
+                        run_module, ret);
+                goto out;
+        }
 
-	text = value_text(result);
+        text = value_text(result);
 
         if (text)
                 fprintf(stdout, "%s\n", text);
