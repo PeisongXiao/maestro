@@ -7,7 +7,7 @@ Related docs:
 
 ## Purpose
 
-[`build/maestroexts`](../../build/maestroexts) inspects a `.mstro`
+`../../build/maestroexts` inspects a `.mstro`
 artifact and prints the required external function binding names.
 
 It does not execute program code.

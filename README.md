@@ -85,7 +85,7 @@ python3 tests/run_tests.py --deep "tests bundles alpha"
 
 For embedded use, build the runtime library with `make runtime`, load
 `.mstro` artifacts through the runtime API, and include
-[`include/maestro/maestro.h`](include/maestro/maestro.h) as the
+`include/maestro/maestro.h` as the
 canonical public entry point.
 
 For `.so`-based extension loading, see

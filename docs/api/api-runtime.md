@@ -11,13 +11,13 @@ Related API docs:
 
 Canonical umbrella header:
 
-- [`include/maestro/maestro.h`](../../include/maestro/maestro.h)
+- `../../include/maestro/maestro.h`
 
 Direct runtime headers:
 
-- [`include/maestro/runtime.h`](../../include/maestro/runtime.h)
-- [`include/maestro/runtime-helpers.h`](../../include/maestro/runtime-helpers.h)
-- [`include/maestro/common.h`](../../include/maestro/common.h)
+- `../../include/maestro/runtime.h`
+- `../../include/maestro/runtime-helpers.h`
+- `../../include/maestro/common.h`
 
 ## Model
 
@@ -40,7 +40,7 @@ Runtime code commonly uses:
 - `maestro_free_fn`
 
 These are declared in
-[`include/maestro/common.h`](../../include/maestro/common.h) and are
+`../../include/maestro/common.h` and are
 also summarized in [`api-common.md`](api-common.md).
 
 ## Runtime Context Lifecycle
@@ -372,11 +372,11 @@ the value is not a list or the index is out of range.
 ## Notes
 
 - Include
-  [`include/maestro/maestro.h`](../../include/maestro/maestro.h) if
+  `../../include/maestro/maestro.h` if
   you want the whole public API.
 - Include only
-  [`include/maestro/runtime.h`](../../include/maestro/runtime.h) and
-  [`include/maestro/runtime-helpers.h`](../../include/maestro/runtime-helpers.h)
+  `../../include/maestro/runtime.h` and
+  `../../include/maestro/runtime-helpers.h`
   if you want a narrower runtime-only surface.
 - Shared constants and typedefs are covered in
   [`api-common.md`](api-common.md).

@@ -8,7 +8,7 @@ Related docs:
 
 ## Purpose
 
-[`build/maestrovm`](../../build/maestrovm) is the standalone runtime
+`../../build/maestrovm` is the standalone runtime
 driver for Maestro bundles.
 
 It can:
@@ -41,7 +41,7 @@ Add shared libraries until the next option or the end of the argument
 list.
 
 Each library must export the
-[`maestro_dll_init`](../../include/maestro/common.h) entry symbol
+`../../include/maestro/common.h` entry symbol
 described in [`../extension-guide.md`](../extension-guide.md).
 
 This option is additive.

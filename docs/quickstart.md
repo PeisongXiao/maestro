@@ -21,7 +21,7 @@ make
 
 ## Compile Sources
 
-Use [`build/maestroc`](../build/maestroc) to compile one or more
+Use `../build/maestroc` to compile one or more
 `.mstr` files into a single linked `.mstro` bundle.
 
 Examples:
@@ -55,7 +55,7 @@ build/maestroexts build/examples/external.mstro
 
 ## Run a Program
 
-Use [`build/maestrovm`](../build/maestrovm) to compile or load an
+Use `../build/maestrovm` to compile or load an
 artifact, validate it, and optionally run a module:
 
 ```sh
@@ -77,7 +77,7 @@ reports success to `stderr`.
 ## Run Source Suites
 
 The repository also contains categorized `.mstr` suites under
-[`tests/mstr/`](../tests/mstr/).
+`../tests/mstr/`.
 
 Run them all:
 

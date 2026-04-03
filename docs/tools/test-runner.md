@@ -7,12 +7,12 @@ Related docs:
 
 ## Purpose
 
-[`tests/run_tests.py`](../../tests/run_tests.py) is the repository’s
+`../../tests/run_tests.py` is the repository’s
 source-suite runner.
 
 It compiles categorized `.mstr` suites with
-[`build/maestroc`](../../build/maestroc), runs selected modules
-through [`build/hostrun`](../../build/hostrun), captures output, and
+`../../build/maestroc`, runs selected modules
+through `../../build/hostrun`, captures output, and
 checks expected results.
 
 ## Synopsis

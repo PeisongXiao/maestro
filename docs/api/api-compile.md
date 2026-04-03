@@ -10,12 +10,12 @@ Related API docs:
 
 Canonical umbrella header:
 
-- [`include/maestro/maestro.h`](../../include/maestro/maestro.h)
+- `../../include/maestro/maestro.h`
 
 Direct compile headers:
 
-- [`include/maestro/compile.h`](../../include/maestro/compile.h)
-- [`include/maestro/common.h`](../../include/maestro/common.h)
+- `../../include/maestro/compile.h`
+- `../../include/maestro/common.h`
 
 ## Model
 
@@ -108,7 +108,7 @@ Arguments:
 ## Related Constants
 
 These are declared in
-[`include/maestro/common.h`](../../include/maestro/common.h):
+`../../include/maestro/common.h`:
 
 - `MAESTRO_MAGIC_STRING`
 - `MAESTRO_DEFAULT_MAGIC`
@@ -120,6 +120,6 @@ These are declared in
 - The compile API works on source files and opaque AST collections.
 - The runtime API works on packed `.mstro` images.
 - If you want the full public surface, include
-  [`include/maestro/maestro.h`](../../include/maestro/maestro.h).
+  `../../include/maestro/maestro.h`.
 - Shared constants and typedefs are covered in
   [`api-common.md`](api-common.md).

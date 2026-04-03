@@ -11,8 +11,8 @@ Related API docs:
 
 Canonical headers:
 
-- [`include/maestro/common.h`](../../include/maestro/common.h)
-- [`include/maestro/maestro.h`](../../include/maestro/maestro.h)
+- `../../include/maestro/common.h`
+- `../../include/maestro/maestro.h`
 
 ## Purpose
 

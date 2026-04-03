@@ -24,7 +24,7 @@ int maestro_dll_init(maestro_ctx *ctx);
 ```
 
 The public symbol name is also available as
-[`MAESTRO_DLL_INIT_SYMBOL`](../include/maestro/common.h).
+`../include/maestro/common.h`.
 
 Return `0` on success. Any non-zero result is treated as an extension
 load failure.
@@ -88,7 +88,7 @@ cc -Iinclude -Wall -Wextra -Werror -std=c11 -O2 -fPIC -shared \
 ```
 
 The runtime process must export Maestro API symbols globally. The
-repository build does this for [`build/maestrovm`](../build/maestrovm)
+repository build does this for `../build/maestrovm`
 and the DLL integration test binary.
 
 ## Loading Extensions

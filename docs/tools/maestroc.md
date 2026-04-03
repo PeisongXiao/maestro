@@ -8,7 +8,7 @@ Related docs:
 
 ## Purpose
 
-[`build/maestroc`](../../build/maestroc) is the standalone compiler
+`../../build/maestroc` is the standalone compiler
 frontend for Maestro source files.
 
 It discovers source inputs, parses them, links them, and writes one

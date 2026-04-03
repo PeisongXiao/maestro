@@ -8,19 +8,19 @@ Maestro library and toolchain. Surface language semantics live in
 
 The canonical public entry point is:
 
-- [`include/maestro/maestro.h`](../../include/maestro/maestro.h)
+- `../../include/maestro/maestro.h`
 
 That umbrella header includes:
 
-- [`include/maestro/common.h`](../../include/maestro/common.h)
-- [`include/maestro/compile.h`](../../include/maestro/compile.h)
-- [`include/maestro/runtime.h`](../../include/maestro/runtime.h)
-- [`include/maestro/runtime-helpers.h`](../../include/maestro/runtime-helpers.h)
+- `../../include/maestro/common.h`
+- `../../include/maestro/compile.h`
+- `../../include/maestro/runtime.h`
+- `../../include/maestro/runtime-helpers.h`
 
 The public API is intentionally opaque. Embedders do not manipulate
 runtime or parser structs directly. The concrete definitions for
 `maestro_ctx`, `maestro_value`, `maestro_ast`, and `maestro_asts` stay
-internal under [`src/`](../../src/).
+internal under `../../src/`.
 
 ## High-Level Pipeline
 
@@ -62,7 +62,7 @@ string form.
 
 Parser diagnostics are written directly to `FILE *err`. Directory
 walking is not part of the parser library;
-[`build/maestroc`](../../build/maestroc) owns source discovery.
+`../../build/maestroc` owns source discovery.
 
 ## Runtime Values
 
@@ -216,11 +216,11 @@ Inspection entrypoints:
 
 - `maestro_validate()`
 - `maestro_list_externals()`
-- [`build/maestroexts`](../../build/maestroexts)
+- `../../build/maestroexts`
 
 ## Build Layout
 
-The repository builds with a single [`Makefile`](../../Makefile).
+The repository builds with a single `../../Makefile`.
 Primary targets are:
 
 - `make runtime`
@@ -230,21 +230,21 @@ Primary targets are:
 - `make test-mstr`
 - `make test-deep`
 
-Outputs are written under [`build/`](../../build/), including:
+Outputs are written under `../../build/`, including:
 
-- [`build/libmaestro.a`](../../build/libmaestro.a)
-- [`build/maestroc`](../../build/maestroc)
-- [`build/maestrovm`](../../build/maestrovm)
-- [`build/maestroexts`](../../build/maestroexts)
-- [`build/hostrun`](../../build/hostrun)
-- [`build/examples/`](../../build/examples/)
+- `../../build/libmaestro.a`
+- `../../build/maestroc`
+- `../../build/maestrovm`
+- `../../build/maestroexts`
+- `../../build/hostrun`
+- `../../build/examples/`
 
 ## Current Scope
 
 The current implementation is intentionally minimal but end-to-end:
 
 - parse and link happen ahead of runtime
-- [`build/maestroc`](../../build/maestroc) is the standalone compiler
+- `../../build/maestroc` is the standalone compiler
   driver
 - runtime loads packed linked bundles zero-copy
 - runtime values are opaque handles
